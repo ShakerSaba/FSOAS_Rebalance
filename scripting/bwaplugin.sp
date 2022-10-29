@@ -235,7 +235,9 @@ public Action LogGameMessage(const char[] message)
 				SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime",GetGameTime()+32);
 			}
 		}
+		return Plugin_Changed;
 	}
+	return Plugin_Continue;
 }
 
 public Action Event_PlayerSpawn(Handle hEvent, const char[] cName, bool dontBroadcast)
@@ -812,7 +814,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		TF2Attrib_SetByDefIndex(iClient,69,1.0); //set attr indexes for third degree
 		SetEntityGravity(iClient,1.0); //reset jetpack gravity;
 	}
-	// return Plugin_Changed;
+	return Plugin_Changed;
 }
 
 public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadcast)
@@ -1904,7 +1906,8 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					if(buttons & IN_ATTACK3) SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",320.0);
 					else if(g_LastButtons[iClient] & IN_ATTACK3)
 					{
-						int disguiseClass = GetEntProp(iClient, Prop_Send, "m_nDisguiseClass");
+						int class = GetEntProp(iClient, Prop_Send, "m_nDisguiseClass");
+						TFClassType disguiseClass = view_as<TFClassType>(class);
 						switch(disguiseClass)
 						{
 							case TFClass_Pyro,TFClass_Engineer,TFClass_Sniper:
@@ -2020,6 +2023,7 @@ public Action PlayerListener(int iClient, const char[] command, int argc)
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
 public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &ammotype, int hitbox, int hitgroup)
@@ -2743,6 +2747,7 @@ public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname
 Action critGlow(Handle timer, int attacker)
 {
 	TF2_AddCondition(attacker,TFCond_CritDemoCharge,(g_nextHit[attacker]-g_lastHit[attacker])*2.0);
+	return Plugin_Continue;
 }
 
 // public void Event_SpawnAmmo(int entity)
@@ -2805,6 +2810,7 @@ public Action Event_PickUpAmmo(int entity, int other)
 			RefillMetal(other,factor,entity,regen);
 		}
 	}
+	return Plugin_Continue;
 }
 
 public Action Event_PickUpHealth(int entity, int other)
@@ -2827,6 +2833,7 @@ public Action Event_PickUpHealth(int entity, int other)
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
 public void RefillMetal(int iClient, int size, int pack, int refill)
@@ -2967,6 +2974,7 @@ public Action PackTimer(Handle timer, int pack)
 {
 	AcceptEntityInput(pack,"Enable");
 	SetEntProp(pack,Prop_Send,"m_iTeamNum",0);
+	return Plugin_Continue;
 }
 
 public void buffSteak(int iClient,int clientFlags)
@@ -2994,6 +3002,7 @@ public Action honorBound(Handle timer, int iClient)
 	{
 		SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",0.0,2);
 	}
+	return Plugin_Continue;
 }
 
 public Action debuffVita(Handle timer, int iClient)
@@ -3026,6 +3035,7 @@ public Action debuffVita(Handle timer, int iClient)
 	TF2Attrib_SetByDefIndex(melee,6,1.0);
 	TF2Attrib_SetByDefIndex(melee,178,1.0);
 	if(meleeIndex == 173) TF2Attrib_SetByDefIndex(melee,811,0.001);
+	return Plugin_Continue;
 }
 
 public Action WeaponSwitch(int iClient, int weapon)
@@ -3071,6 +3081,7 @@ public Action WeaponSwitch(int iClient, int weapon)
 		// 	}
 		// }
 	}
+	return Plugin_Continue;
 }
 
 // public Action updateGlow(Handle timer, int client){ //radar glow
@@ -3098,6 +3109,7 @@ public Action updateHeads(Handle timer, DataPack pack)
 	// TF2Attrib_SetByDefIndex(melee,125,healthPenalty);
 	if(respawn==1)
 		TF2Util_TakeHealth(client,200.0);
+	return Plugin_Continue;
 }
 
 Action updateVacc(Handle handle,DataPack pack)
@@ -3181,12 +3193,14 @@ public Action chocolateHeal(Handle timer, int iClient)
 	{
 		TF2Util_TakeHealth(iClient,35.0,TAKEHEALTH_IGNORE_DEBUFFS);
 	}
+	return Plugin_Continue;
 }
 
 public Action shortCircuitAlt(Handle timer, int secondary)
 {
 	//increase next firing for alt fire
 	SetEntPropFloat(secondary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime()+1.0);
+	return Plugin_Continue;
 }
 
 stock void CreateParticle(int ent, char[] particleType, float time,float angleX=0.0,float angleY=0.0,float Xoffset=0.0,float Yoffset=0.0,float Zoffset=0.0,float size=1.0,bool update=true,bool parent=true,bool attach=false,float angleZ=0.0)
@@ -3262,6 +3276,7 @@ public Action DeleteParticle(Handle timer, int particle)
 		if (StrEqual(classN, "info_particle_system", false))
 			RemoveEdict(particle);
 	}
+	return Plugin_Continue;
 }
 
 public Action UpdateParticle(Handle timer, DataPack pack)
@@ -3309,6 +3324,7 @@ public Action MelterView(Handle timer, int view)
 		SetEntProp(view, Prop_Send, "m_nSequence",18);
 		SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.125);
 	}
+	return Plugin_Continue;
 }
 
 public void Manmelter_SecondaryAttack(int entity,int client,float angles[3])
@@ -3588,6 +3604,7 @@ public Action CaberTauntkill(Handle timer, int client)
 			}
 		}
 	}
+	return Plugin_Continue;
 }
 
 public Action SMGTauntkill(Handle timer, int client)
@@ -3646,6 +3663,7 @@ public Action SMGTauntkill(Handle timer, int client)
 			SDKHooks_TakeDamage(closest, secondary, client, 65.0, DMG_CLUB, secondary, NULL_VECTOR, impact_pos);
 		}
 	}
+	return Plugin_Continue;
 }
 
 float ValveRemapVal(float val, float a, float b, float c, float d)
@@ -3728,6 +3746,7 @@ public Action gasExplode(Handle timer, DataPack pack)
 		SDKHooks_TakeDamage(victim, gasser, gasser, 20.0, DMG_SLASH, secondary, NULL_VECTOR, damagePosition);
 		CreateParticle(victim,"dragons_fury_effect",2.0);
 	}
+	return Plugin_Continue;
 }
 
 void laserSpawn(int iEnt)
@@ -3987,6 +4006,7 @@ Action updateNeedle(Handle timer,int entity)
 		SetEntProp(entity, Prop_Data, "m_CollisionGroup", 24);
 		SetEntData(entity, 516, 24, 4, true); //m_CollisionGroup
 	}
+	return Plugin_Continue;
 }
 
 Action hitNeedle(Handle timer,DataPack pack) //needle hits target
@@ -4027,12 +4047,14 @@ Action hitNeedle(Handle timer,DataPack pack) //needle hits target
 		SDKHooks_TakeDamage(other, owner, owner, damage, damagetype, weapon, NULL_VECTOR, targetPos);
 		CreateTimer(0.01,deleteNeedle,entity);
 	}
+	return Plugin_Continue;
 }
 
 Action deleteNeedle(Handle timer,int entity) //delete needles on world
 {
 	if(IsValidEdict(entity))
 		AcceptEntityInput(entity,"Kill");
+	return Plugin_Continue;
 }
 
 Action flareTouch(int entity, int other)
@@ -4198,6 +4220,7 @@ Action KillOrb(Handle timer, int flare)
 		}
 		AcceptEntityInput(flare,"KillHierarchy");
 	}
+	return Plugin_Continue;
 }
 
 // Action projSpawn(int entity){
