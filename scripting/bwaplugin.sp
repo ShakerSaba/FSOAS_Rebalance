@@ -2082,7 +2082,7 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 					if(primaryIndex == 230)
 					{
 						if(hitgroup == 1)
-							TF2_AddCondition(victim,TFCond_Jarated,4.1,attacker); //increase jarate duration on headshot
+							TF2_AddCondition(victim,TFCond_Jarated,5.1,attacker); //increase jarate duration on headshot
 					}
 				}
 			}
