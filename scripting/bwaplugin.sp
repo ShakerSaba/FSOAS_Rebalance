@@ -45,6 +45,7 @@ float PARACHUTE_TIME = 6.0;
 #define TF_CONDFLAG_HEALSTEAL		(1 << 7)
 #define TF_CONDFLAG_HOVER			(1 << 8)
 #define TF_CONDFLAG_FAKE			(1 << 9)
+#define TF_CONDFLAG_INFIRE			(1 << 10)
 
 #define EF_BONEMERGE                (1 << 0)
 #define EF_NOSHADOW                 (1 << 4)
@@ -168,10 +169,10 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 			SDKHook(iEnt, SDKHook_SpawnPost, flareSpawn);
 			SDKHook(iEnt, SDKHook_StartTouch, flareTouch);
 		}
-		// else if(StrEqual(classname, "tf_projectile_pipe_remote")) //syringe
-		// {
-		// 	SDKHook(iEnt, SDKHook_SpawnPost, needleSpawn);
-		// }
+		else if(StrEqual(classname, "tf_projectile_syringe")) //syringe
+		{
+			SDKHook(iEnt, SDKHook_SpawnPost, needleSpawn);
+		}
 		else if(StrEqual(classname,"obj_sentrygun") || StrEqual(classname,"obj_dispenser") || StrEqual(classname,"obj_teleporter"))
 		{
 			SDKHook(iEnt, SDKHook_OnTakeDamage, BuildingDamage);
@@ -250,7 +251,7 @@ public Action Event_PlayerSpawn(Handle hEvent, const char[] cName, bool dontBroa
 	pack.WriteCell(iClient);
 	pack.WriteString(event);
 	float time=0.1;
-	if(IsFakeClient(iClient)) time=0.2;
+	if(IsFakeClient(iClient)) time=0.25;
 	CreateTimer(time,PlayerSpawn,pack);
 	return Plugin_Changed;
 }
@@ -341,20 +342,12 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Syringe Gun
 			case 17,204:
 			{
-				// TF2Attrib_SetByDefIndex(primary,280,4.0); //projectile override
-				// TF2Attrib_SetByDefIndex(primary,285,1.0); //projectile can't be deflected
-				// TF2Attrib_SetByDefIndex(primary,671,1.0); //grenade no bounce
-				// TF2Attrib_SetByDefIndex(primary,681,1.0); //grenade no spin
-				// TF2Attrib_SetByDefIndex(primary,120,20.0); //sticky arm time penalty
+				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
 			}
 			//The Blutsauger
 			case 36:
 			{
-				// TF2Attrib_SetByDefIndex(primary,280,4.0); //projectile override
-				// TF2Attrib_SetByDefIndex(primary,285,1.0); //projectile can't be deflected
-				// TF2Attrib_SetByDefIndex(primary,671,1.0); //grenade no bounce
-				// TF2Attrib_SetByDefIndex(primary,681,1.0); //grenade no spin
-				// TF2Attrib_SetByDefIndex(primary,120,20.0); //sticky arm time penalty
+				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
 				TF2Attrib_SetByDefIndex(primary,881,0.0); //add_health_regen
 				TF2Attrib_SetByDefIndex(primary,3,0.63); //clip size penalty
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
@@ -363,11 +356,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//The Overdose
 			case 412:
 			{
-				// TF2Attrib_SetByDefIndex(primary,280,4.0); //projectile override
-				// TF2Attrib_SetByDefIndex(primary,285,1.0); //projectile can't be deflected
-				// TF2Attrib_SetByDefIndex(primary,671,1.0); //grenade no bounce
-				// TF2Attrib_SetByDefIndex(primary,681,1.0); //grenade no spin
-				// TF2Attrib_SetByDefIndex(primary,120,20.0); //sticky arm time penalty
+				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
 				TF2Attrib_SetByDefIndex(primary,1,0.8); //damage penalty
 				TF2Attrib_SetByDefIndex(primary,547,0.75); //deploy speed bonus
 			}
@@ -433,6 +422,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				{ 
 					TF2Attrib_SetByDefIndex(primary,647,1.0);
 					if(primaryIndex != 230) TF2Attrib_SetByDefIndex(primary,144,3.0);
+					if(primaryIndex == 752) TF2Attrib_SetByDefIndex(primary,51,0.0);
 				}
 				//set clip and reserve
 				TF2Attrib_SetByDefIndex(primary,303,4.0); //set clip ammo
@@ -1064,105 +1054,130 @@ public void OnGameFrame()
 			// 	ShowHudText(iClient,3,"RADAR %.0f%%",meter);
 			// }
 
-			if(TFClass_Sniper == TF2_GetPlayerClass(iClient)) //track sniper reload animations
+			switch(TF2_GetPlayerClass(iClient))
 			{
-				if(primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092)
+				case TFClass_Sniper:
 				{
-					int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
-					int reload = GetEntProp(primary, Prop_Send, "m_iReloadMode");
-					int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
-					if(sequence==29 || sequence==28) //in case of last shot in clip, allows for auto-reload
+					if(primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092)
 					{
-						float cycle = GetEntPropFloat(view, Prop_Data, "m_flCycle");
-						if (cycle>=1.0) SetEntProp(view, Prop_Send, "m_nSequence",30);
-					}
-					if(reload!=0)
-					{
-						float reloadSpeed = 2.0;
-						if(primaryIndex == 230 || TF2_IsPlayerInCondition(iClient,TFCond_FocusBuff)) reloadSpeed=1.5;
-						float clientPos[3];
-						GetEntPropVector(iClient, Prop_Send, "m_vecOrigin", clientPos);
-						
-						SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",3.0/reloadSpeed);
-						
-						//play reload sounds
-						if(reload==1)
+						int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
+						int reload = GetEntProp(primary, Prop_Send, "m_iReloadMode");
+						int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
+						if(sequence==29 || sequence==28) //in case of last shot in clip, allows for auto-reload
 						{
-							if(sequence!=50) SetEntProp(view, Prop_Send, "m_nSequence",50);
-							if(g_airTime[iClient]/reloadSpeed>0.1)
-							{
-								EmitAmbientSound("weapons/widow_maker_pump_action_forward.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
-								SetEntProp(primary, Prop_Send, "m_iReloadMode",2);
-							}
-						}else if(reload==2)
-						{
-							if(sequence!=51) SetEntProp(view, Prop_Send, "m_nSequence",51);
-							if(g_airTime[iClient]/reloadSpeed>0.4)
-							{
-								EmitAmbientSound("weapons/revolver_reload_cylinder_arm.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
-								SetEntProp(primary, Prop_Send, "m_iReloadMode",3);
-							}
-						}else if(reload==3)
-						{
-							if(sequence!=52) SetEntProp(view, Prop_Send, "m_nSequence",52);
-							if(g_airTime[iClient]/reloadSpeed>0.8)
-							{
-								EmitAmbientSound("weapons/widow_maker_pump_action_back.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
-								SetEntProp(primary, Prop_Send, "m_iReloadMode",4);
-							}
+							float cycle = GetEntPropFloat(view, Prop_Data, "m_flCycle");
+							if (cycle>=1.0) SetEntProp(view, Prop_Send, "m_nSequence",30);
 						}
+						if(reload!=0)
+						{
+							float reloadSpeed = 2.0;
+							if(primaryIndex == 230) reloadSpeed=1.5;
+							float clientPos[3];
+							GetEntPropVector(iClient, Prop_Send, "m_vecOrigin", clientPos);
+							
+							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",3.0/reloadSpeed);
+							
+							//play reload sounds
+							if(reload==1)
+							{
+								if(sequence!=50) SetEntProp(view, Prop_Send, "m_nSequence",50);
+								if(g_airTime[iClient]/reloadSpeed>0.1)
+								{
+									EmitAmbientSound("weapons/widow_maker_pump_action_forward.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+									SetEntProp(primary, Prop_Send, "m_iReloadMode",2);
+								}
+							}else if(reload==2)
+							{
+								if(sequence!=51) SetEntProp(view, Prop_Send, "m_nSequence",51);
+								if(g_airTime[iClient]/reloadSpeed>0.4)
+								{
+									EmitAmbientSound("weapons/revolver_reload_cylinder_arm.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+									SetEntProp(primary, Prop_Send, "m_iReloadMode",3);
+								}
+							}else if(reload==3)
+							{
+								if(sequence!=52) SetEntProp(view, Prop_Send, "m_nSequence",52);
+								if(g_airTime[iClient]/reloadSpeed>0.8)
+								{
+									EmitAmbientSound("weapons/widow_maker_pump_action_back.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+									SetEntProp(primary, Prop_Send, "m_iReloadMode",4);
+								}
+							}
 
-						g_airTime[iClient] += 1.0/66;
-					}
-				}
-			}
-			else if(TFClass_Pyro == TF2_GetPlayerClass(iClient))
-			{
-				if(primaryIndex != 1178 && primaryIndex != 594 && primaryIndex !=1 && primaryIndex !=-1) //handle airblast, except for dragon's fury and phlog
-				{
-					float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
-					float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
-					int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-					if(weaponState==3) //in-airblast
-					{
-						if(meter2 < meter) //done to make limit it to first frame in this state
-						{
-							meter-=33.0;
-							if(meter<0.0) meter = 0.0;
-							//update pressure meter
-							SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
-							SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
-							TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200); //set next airblast force
+							g_airTime[iClient] += 1.0/66;
 						}
 					}
-					else if(weaponState!=3) //out of airblast
-					{
-						//update pressure meter
-						if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+16.67/66, 0);
-						else if(meter>100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
-						//update force of airblast in increments
-						int force = RoundToNearest(meter);
-						if(force % 5 == 0) TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200);
-					}
-					SetHudTextParams(-0.1, -0.15, 0.5, 255, 255, 255, 255);
-					ShowHudText(iClient,2,"%.0f%% PRESSURE",meter);
 				}
-			}
-			else if (TFClass_Heavy == TF2_GetPlayerClass(iClient))
-			{
-				if(primary != -1)
+				case TFClass_Pyro:
 				{
-					int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-					int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
-					int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
-					if(sequence == 23 && weaponState == 0)
+					if(primaryIndex != 1178 && primaryIndex != 594 && primaryIndex !=1 && primaryIndex !=-1) //handle airblast, except for dragon's fury and phlog
 					{
-						SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33);
-						g_airTime[iClient] += 1.0/66;
+						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
+						float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
+						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+						if(weaponState==3) //in-airblast
+						{
+							if(meter2 < meter) //done to make limit it to first frame in this state
+							{
+								meter-=33.0;
+								if(meter<0.0) meter = 0.0;
+								//update pressure meter
+								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
+								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
+								TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200); //set next airblast force
+							}
+						}
+						else if(weaponState!=3) //out of airblast
+						{
+							//update pressure meter
+							if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+16.67/66, 0);
+							else if(meter>100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
+							//update force of airblast in increments
+							int force = RoundToNearest(meter);
+							if(force % 5 == 0) TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200);
+						}
+						SetHudTextParams(-0.1, -0.15, 0.5, 255, 255, 255, 255);
+						ShowHudText(iClient,2,"%.0f%% PRESSURE",meter);
 					}
-					else
+				}
+				case TFClass_Heavy:
+				{
+					if(primary != -1)
 					{
-						g_airTime[iClient] = 0.0;
+						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+						int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
+						int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
+						if(sequence == 23 && weaponState == 0)
+						{
+							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33);
+							g_airTime[iClient] += 1.0/66;
+						}
+						else
+						{
+							g_airTime[iClient] = 0.0;
+						}
+					}
+				}
+				case TFClass_Medic:
+				{
+					char[] current = new char[64];
+					GetClientWeapon(iClient,current,64);
+					if ((StrEqual("tf_weapon_syringegun_medic",current) || StrEqual("Syringe Gun",current)) && g_condFlags[iClient] & TF_CONDFLAG_INFIRE)
+					{
+						float lastAttack = GetEntPropFloat(primary, Prop_Send, "m_flLastFireTime");
+						if(lastAttack > g_lastFire[iClient])
+						{
+							g_lastFire[iClient] = lastAttack;
+							switch(primaryIndex)
+							{
+								case 17,204,36,412:
+								{
+									float angles[3];
+									GetClientEyeAngles(iClient,angles);
+									Syringe_PrimaryAttack(iClient,primary,angles,primaryIndex);
+								}
+							}
+						}
 					}
 				}
 			}
@@ -1477,12 +1492,11 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 		{
 			return Plugin_Handled;
 		}
-		case TFCond_FocusBuff:
-		{ //reset Heatmaker tracer
+		case TFCond_FocusBuff: //reset Heatmaker tracer
+		{
 			int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
-			int primaryIndex = -1;
-			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-			if(primaryIndex != 230) TF2Attrib_SetByDefIndex(primary,144,1.0);
+			TF2Attrib_SetByDefIndex(primary,144,1.0);
+			TF2Attrib_SetByDefIndex(primary,51,1.0);
 		}
 		case TFCond_UberFireResist,TFCond_UberBulletResist,TFCond_UberBlastResist:
 		{
@@ -1579,9 +1593,8 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 		case TFCond_FocusBuff: //reset Heatmaker tracer
 		{
 			int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
-			int primaryIndex = -1;
-			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-			if(primaryIndex != 230) TF2Attrib_SetByDefIndex(primary,144,3.0);
+			TF2Attrib_SetByDefIndex(primary,144,3.0);
+			TF2Attrib_SetByDefIndex(primary,51,0.0);
 		}
 		case TFCond_Cloaked: //dead ringer reset cloak
 		{
@@ -1679,7 +1692,9 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 							// SetEntityRenderColor(g_customWeapon[iClient], _, _, _, 0);
 							g_airTime[iClient] = 0.0;
 						}
-					}else if(TF2_IsPlayerInCondition(iClient,TFCond_FocusBuff) && clip<maxClip){
+					}
+					else if(TF2_IsPlayerInCondition(iClient,TFCond_FocusBuff) && clip<maxClip)
+					{
 						int newClip = ammoCount-maxClip < 1 ? (ammoCount-maxClip+clip > maxClip ? maxClip : ammoCount-1+clip) : maxClip;
 						int newAmmo  = ammoCount-maxClip+clip >= 1 ? ammoCount-maxClip+clip : 1;
 						SetEntProp(iClient, Prop_Data, "m_iAmmo", newAmmo , _, primaryAmmo);
@@ -1875,6 +1890,15 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 			}
 			case TFClass_Medic:
 			{
+				//create new syringes for medic
+				if ((StrEqual("tf_weapon_syringegun_medic",current) || StrEqual("Syringe Gun",current)) && (buttons & IN_ATTACK == IN_ATTACK))
+				{
+					g_condFlags[iClient] |= TF_CONDFLAG_INFIRE;
+				}
+				else if ((g_LastButtons[iClient] & IN_ATTACK))
+				{
+					g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
+				}
 				//vita-saw alt-fire
 				if ((StrEqual("tf_weapon_bonesaw",current) || StrEqual("Bonesaw",current)) && meleeIndex==173 &&
 				(buttons & IN_ATTACK2 == IN_ATTACK2) && !(g_LastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2) && !TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
@@ -2386,11 +2410,16 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					}
 				}
 				if(weaponIndex == 44 && inflictor != attacker) //sandman ball
-				{ 
+				{
 					float distance = getPlayerDistance(attacker,victim); //get distance from attacker to victim; couldn't actually find travel time of ball
-					if(distance>1500.0)
-						distance = 1500.0; //distance for moonshot
-					float duration = RoundToNearest(distance/75.0)/4.0; //round to nearest quarter second. range of 0-5
+					if(distance>=1400.0){
+						distance = 1400.0; //distance for moonshot
+						if(!(damagetype & DMG_CRIT)){
+							damage *= 3.0;
+							damagetype |= DMG_CRIT;
+						}
+					}
+					float duration = 0.1 + RoundToNearest(distance/70.0)/4.0; //round to nearest quarter second. range of 0-5
 					if(duration>=1.0)
 						TF2_AddCondition(victim,TFCond_MarkedForDeath,duration); //minimum 1 second, ~300 distance
 					TF2_RemoveCondition(victim,TFCond_Dazed); //no slow (removes of other slow effects but most too situational to worry)
@@ -2523,35 +2552,37 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					}
 				}
 			}
-			// case TFClass_Medic:
-			// {
-			// 	switch(weaponIndex){
-			// 		case 17,204,36,412:{
-			// 			int isCrit = 0;
-			// 			Address address = TF2Attrib_GetByDefIndex(weapon,1);
-			// 			damage = 10.0;
-			// 			if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
-			// 			if(isKritzed(attacker))
-			// 			{
-			// 				isCrit = 1;
-			// 				damage *= 3;
-			// 			}
-			// 			else{
-			// 				float dist = getPlayerDistance(attacker,victim);
-			// 				if(dist<512) damage *= 1.0 + 0.2*(512-dist)/512;
-			// 				if(isMiniKritzed(attacker,victim)){
-			// 					isCrit = 1;
-			// 					damage *= 1.35;
-			// 				}else{
-			// 					if(dist>512) damage *= 1.0 - 0.50*(dist > 1024.0 ? 1024.0 : dist)/1024;
-			// 				}
-			// 			}
-						
-			// 			damagetype = DMG_BULLET;
-			// 			if (isCrit!=0) damagetype |= DMG_CRIT;
-			// 		}
-			// 	}
-			// }
+			case TFClass_Medic:
+			{
+				switch(weaponIndex){
+					case 17,204,36,412:{
+						if(damage>1 && !(damagetype & DMG_BULLET)){
+							int isCrit = 0;
+							Address address = TF2Attrib_GetByDefIndex(weapon,1);
+							damage = 10.0;
+							if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
+							if(isKritzed(attacker))
+							{
+								isCrit = 1;
+								damage *= 3;
+							}
+							else{
+								float dist = getPlayerDistance(attacker,victim);
+								if(dist<512) damage *= 1.0 + 0.2*(512-dist)/512;
+								if(isMiniKritzed(attacker,victim)){
+									isCrit = 1;
+									damage *= 1.35;
+								}else{
+									if(dist>512) damage *= 1.0 - 0.50*(dist > 1024.0 ? 1024.0 : dist)/1024;
+								}
+							}
+							
+							damagetype = DMG_BULLET | DMG_NOCLOSEDISTANCEMOD | DMG_PREVENT_PHYSICS_FORCE | DMG_USEDISTANCEMOD;
+							if (isCrit!=0) damagetype |= DMG_CRIT;
+						}
+					}
+				}
+			}
 		}
 		switch(victimClass)
 		{
@@ -2720,14 +2751,14 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 		int weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 		switch(weaponIndex)
 		{
-			// case 17,204,36,412:{ //syringe damage
-			// 	if(damage>1 && !(damagetype & DMG_BULLET)){
-			// 		Address address = TF2Attrib_GetByDefIndex(weapon,1);
-			// 		damage = 10.0;
-			// 		if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
-			// 		damagetype = DMG_BULLET;
-			// 	}
-			// }
+			case 17,204,36,412:{ //syringe damage
+				if(damage>1 && !(damagetype & DMG_BULLET)){
+					Address address = TF2Attrib_GetByDefIndex(weapon,1);
+					damage = 10.0;
+					if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
+					damagetype = DMG_BULLET;
+				}
+			}
 			case 460:
 			{ //enforcer piercing sapper armor
 				int sapped = GetEntProp(building, Prop_Send, "m_bHasSapper");
@@ -3157,14 +3188,14 @@ Action updateVacc(Handle handle,DataPack pack)
 {
 	pack.Reset();
 	int client = pack.ReadCell();
-	TFTeam team = TF2_GetClientTeam(client);
-	int flag = pack.ReadCell();
-	float time = pack.ReadFloat();
-	float interval = pack.ReadFloat();
-	g_condFlags[client] &= ~flag;
-
 	if(IsClientInGame(client))
 	{
+		TFTeam team = TF2_GetClientTeam(client);
+		int flag = pack.ReadCell();
+		float time = pack.ReadFloat();
+		float interval = pack.ReadFloat();
+		g_condFlags[client] &= ~flag;
+
 		if(time > 0)
 		{
 			char[] resist = new char[64];
@@ -3215,13 +3246,18 @@ Action updateVacc(Handle handle,DataPack pack)
 			TF2Attrib_RemoveByDefIndex(client,400);//pickup intel
 			return Plugin_Stop;
 		}
+
+		time -= interval;
+		pack.Reset();
+		pack.WriteCell(client);
+		pack.WriteCell(flag);
+		pack.WriteFloat(time);
+		pack.WriteFloat(interval);
 	}
-	time -= interval;
-	pack.Reset();
-	pack.WriteCell(client);
-	pack.WriteCell(flag);
-	pack.WriteFloat(time);
-	pack.WriteFloat(interval);
+	else
+	{
+		return Plugin_Stop;
+	}
 	return Plugin_Continue;
 }
 
@@ -3872,228 +3908,123 @@ void flareSpawn(int entity)
 	}
 }
 
-// void needleSpawn(int entity) //new syringes converted from stickies
-// {
-// 	int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-// 	if(IsValidClient(owner))
-// 	{
-// 		int weapon = TF2Util_GetPlayerLoadoutEntity(owner, TFWeaponSlot_Primary, true);
-// 		int wepIndex = -1;
-// 		if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-// 		switch(wepIndex)
-// 		{
-// 			case 17,204,36,412:
-// 			{
-// 				if(wepIndex==36) SetEntityModel(entity,"models/weapons/c_models/c_leechgun/c_leech_proj.mdl");
-// 				else SetEntityModel(entity,"models/weapons/w_models/w_syringe_proj.mdl");
-// 				// int team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
-// 				// bool kritzed = isKritzed(owner);
+public void Syringe_PrimaryAttack(int iClient,int primary,float angles[3],int index)
+{
+	int syringe = CreateEntityByName("tf_projectile_syringe");
+	if(syringe != -1)
+	{
+		int team = GetClientTeam(iClient);
+		bool kritzed = isKritzed(iClient);
+		float pos[3],vel[3],ang[3],playervel[3],offset[3];
+		GetClientEyePosition(iClient, pos);
+		GetEntPropVector(iClient, Prop_Data, "m_vecAbsVelocity", playervel);
+		ang=angles;
+		ang[0] += GetRandomFloat(-1.4,1.4) - 1.5; ang[1] += GetRandomFloat(-1.4,1.4) + 0.25; //add spread
+		offset[0] = (1.0 * Sine(DegToRad(ang[1])));
+		offset[1] = (-1.0 * Cosine(DegToRad(ang[1])));
+		offset[2] = -2.5;
+		//inherit player velocity
+		offset[0] += playervel[0]*0.1125;
+		offset[1] += playervel[1]*0.1125;
+		offset[2] += playervel[2]*0.1125;
+		pos[0]+=offset[0]; pos[1]+=offset[1]; pos[2]+=offset[2];
 
-// 				float pos[3],vel[3],ang[3],playervel[3];
-// 				GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
-// 				pos[2] -= 10.0;
-// 				GetClientEyeAngles(owner,ang);
-// 				ang[0] += GetRandomFloat(-1.4,1.4) - 1.5; ang[1] += GetRandomFloat(-1.4,1.4) + 0.25; //add spread
-
-// 				GetEntPropVector(owner, Prop_Data, "m_vecAbsVelocity", playervel); //inheret player velocity
-				
-// 				vel[0] = Cosine(DegToRad(ang[0]))*Cosine(DegToRad(ang[1]))*1500.0 + playervel[0]*0.5;
-// 				vel[1] = Cosine(DegToRad(ang[0]))*Sine(DegToRad(ang[1]))*1500.0 + playervel[1]*0.5;
-// 				vel[2] = Sine(DegToRad(ang[0]))*-1600.0 + playervel[2]*0.5 - 50;
-				
-// 				TeleportEntity(entity, pos, ang, vel);	//Transport syringe
-// 				SDKHook(entity, SDKHook_StartTouch, needleTouch);
-// 				SDKHook(entity, SDKHook_SetTransmit, needleThink);
-// 				// SDKHook(entity, SDKHook_ShouldCollide, needleCollide);
-// 				SetEntProp(entity, Prop_Send, "m_triggerBloat", 7);
-// 				SetEntPropFloat(entity, Prop_Send, "m_flModelScale", 1.2);
-// 				SetEntDataFloat(entity,912,1.2,true); //m_flModelScale
-// 				CreateTimer(0.01,updateNeedle,entity);
-// 				CreateTimer(8.0,deleteNeedle,entity);
-// 			}
-// 		}
-// 	}
-// }
-
-// Action needleThink(int entity, int client)
-// { //update new needle physics
-// 	int weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
-// 	int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
-// 	int trigger = GetEntProp(entity, Prop_Send, "m_triggerBloat");
-// 	if(GetEntProp(entity, Prop_Send, "m_bTouched")==1) // on surface
-// 	{
-// 		if(trigger > 2) //impact
-// 		{
-// 			SetEntProp(entity, Prop_Send, "m_triggerBloat", 2);
-// 			CreateParticle(entity,"impact_metal",1.0,_,_,_,_,_,_,false);
-// 			CreateTimer(3.0,deleteNeedle,entity);
-// 		}
-// 		else if(trigger>0) //adjust rotation for a bit
-// 		{
-// 			float ang[3];
-// 			GetClientEyeAngles(owner,ang);
-// 			SetEntPropVector(entity, Prop_Data, "m_angRotation", ang);
-// 			SetEntProp(entity, Prop_Send, "m_triggerBloat", trigger-1);
-// 		}
-// 		//keep needles still
-// 		float vel[3];
-// 		SetEntPropVector(entity, Prop_Data, "m_vecAbsVelocity",vel);
-// 	}
-// 	else
-// 	{
-// 		int interval = RoundFloat(MaxClients/6.0); //split clients to check against
-// 		SetEntProp(entity, Prop_Send, "m_triggerBloat", trigger+1);
-// 		if(trigger == 6 || trigger == 7) //reset needle
-// 		{
-// 			SetEntProp(entity, Prop_Send, "m_triggerBloat", 1);
-// 			if(trigger==7)
-// 			{
-// 				float ang[3];
-// 				GetClientEyeAngles(owner,ang);
-// 				SetEntPropVector(entity, Prop_Data, "m_angRotation", ang);
-// 			}
-// 		}
-// 		else //check if needle hits client
-// 		{
-// 			for(int i=1+(trigger-1)*interval;i<=interval*trigger;i++)
-// 			{
-// 				if(IsValidClient(i) && owner != i)
-// 				{
-// 					if(TF2_GetClientTeam(owner) != TF2_GetClientTeam(i) && IsPlayerAlive(i))
-// 					{
-// 						float pos[3],target[3];
-// 						GetEntPropVector(entity, Prop_Send, "m_vecOrigin",pos);
-// 						GetEntPropVector(i, Prop_Send, "m_vecOrigin",target);
-// 						if(-40.0 <= target[0]-pos[0] && target[0]-pos[0] <= 40.0 &&
-// 							-40.0 <= target[1]-pos[1] && target[1]-pos[1] <= 40.0 &&
-// 							-90.0 <= target[2]-pos[2] && target[2]-pos[2] <= 10)
-// 						{
-// 							DataPack pack = new DataPack();
-// 							pack.Reset();
-// 							pack.WriteCell(entity);
-// 							pack.WriteCell(owner);
-// 							pack.WriteCell(i);
-// 							pack.WriteCell(GetEntPropEnt(entity, Prop_Send, "m_hLauncher"));
-// 							SetEntProp(entity, Prop_Send, "m_bTouched",1);
-// 							CreateTimer(0.01,hitNeedle,pack);
-// 							break;
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// 	SetEntPropFloat(entity, Prop_Data, "m_flGravity", 0.3);
-// 	SetEntPropFloat(entity, Prop_Data, "m_flFriction",0.0);
-// 	return Plugin_Changed;
-// }
-
-// Action needleTouch(int entity, int other) //handle needles impact
-// {
-// 	int weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
-// 	int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
-// 	if(IsValidClient(owner) && owner!=other)
-// 	{
-// 		if(IsValidClient(other))
-// 		{
-// 			if(TF2_GetClientTeam(owner) != TF2_GetClientTeam(other) && IsPlayerAlive(other) && GetEntProp(entity, Prop_Send, "m_bTouched")!=1)
-// 			{
-// 				DataPack pack = new DataPack();
-// 				pack.Reset();
-// 				pack.WriteCell(entity);
-// 				pack.WriteCell(owner);
-// 				pack.WriteCell(other);
-// 				pack.WriteCell(weapon);
-// 				SetEntProp(entity, Prop_Send, "m_bTouched",1);
-// 				CreateTimer(0.01,hitNeedle,pack);
-// 			}
-// 		}
-// 		else{
-// 			char class[64];
-// 			GetEntityClassname(other, class, sizeof(class));
-// 			if(StrContains(class,"obj_") != -1)
-// 			{
-// 				Address address = TF2Attrib_GetByDefIndex(weapon,1);
-// 				float damage = 10.0;
-// 				if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
-// 				float targetPos[3];
-// 				GetEntPropVector(other, Prop_Send, "m_vecOrigin", targetPos);
-// 				SDKHooks_TakeDamage(other, owner, owner, damage, DMG_BULLET, weapon, NULL_VECTOR, targetPos);
-
-// 				int sound = RoundFloat(GetGameTime());
-// 				if(sound%2==0) EmitAmbientSound("weapons/cbar_hit1.wav",targetPos,other,_,_,0.7);
-// 				else EmitAmbientSound("weapons/cbar_hit2.wav",targetPos,other,_,_,0.7);
-// 				CreateTimer(0.01,deleteNeedle,entity);
-// 				return Plugin_Handled;
-// 			}
-// 		}
-// 	}
-// 	return Plugin_Continue;
-// }
-
-// Action updateNeedle(Handle timer,int entity)
-// {
-// 	if(IsValidEdict(entity))
-// 	{
-// 		float maxs[3],mins[3];
-// 		maxs[0] = 3.0; maxs[1] = 3.0; maxs[2] = 3.0;
-// 		mins[0] = (0.0 - maxs[0]); mins[1] = (0.0 - maxs[1]); mins[2] = (0.0 - maxs[2]);
+		if(index==412)
+		{
+			if(kritzed) EmitAmbientSound("weapons/overdose_shoot_crit.wav",pos,iClient);
+			else EmitAmbientSound("weapons/overdose_shoot.wav",pos,iClient);
+		}
+		else
+		{
+			if(kritzed) EmitAmbientSound("weapons/syringegun_shoot_crit.wav",pos,iClient);
+			else EmitAmbientSound("weapons/syringegun_shoot.wav",pos,iClient);
+		}
+		SetEntPropEnt(syringe, Prop_Send, "m_hOwnerEntity", iClient);
+		SetEntPropEnt(syringe, Prop_Send, "m_hLauncher", primary);
+		SetEntProp(syringe, Prop_Data, "m_iTeamNum", team);
+		SetEntProp(syringe, Prop_Send, "m_iTeamNum", team);
+		SetEntProp(syringe, Prop_Data, "m_CollisionGroup", 24);
+		SetEntProp(syringe, Prop_Data, "m_usSolidFlags", 0);
+		// SetEntProp(syringe, Prop_Send, "m_iProjectileType", 8);
+		SetEntProp(syringe, Prop_Data, "m_nSkin", team-2);
+		SetEntProp(syringe, Prop_Send, "m_nSkin", team-2);
+		SetEntPropVector(syringe, Prop_Data, "m_angRotation", ang);
+		if(index==36) SetEntityModel(syringe, "models/weapons/c_models/c_leechgun/c_leech_proj.mdl");
+		else SetEntityModel(syringe, "models/weapons/w_models/w_syringe_proj.mdl");
+		SetEntPropFloat(syringe, Prop_Send, "m_flModelScale", 1.5);
 		
-// 		SetEntPropVector(entity, Prop_Send, "m_vecMaxs", maxs);
-// 		SetEntPropVector(entity, Prop_Send, "m_vecMins", mins);
-// 		SetEntProp(entity, Prop_Data, "m_CollisionGroup", 24);
-// 		SetEntData(entity, 516, 24, 4, true); //m_CollisionGroup
-// 	}
-// 	return Plugin_Continue;
-// }
+		DispatchSpawn(syringe);
+		
+		vel[0] = Cosine(DegToRad(ang[0]))*Cosine(DegToRad(ang[1]))*1400.0 + playervel[0]*0.0;
+		vel[1] = Cosine(DegToRad(ang[0]))*Sine(DegToRad(ang[1]))*1400.0 + playervel[1]*0.0;
+		vel[2] = Sine(DegToRad(ang[0]))*-1400.0 + playervel[2]*0.0;
 
-// Action hitNeedle(Handle timer,DataPack pack) //needle hits target
-// {
-// 	pack.Reset();
-// 	int entity = pack.ReadCell();
-// 	if(IsValidEdict(entity))
-// 	{
-// 		int owner = pack.ReadCell();
-// 		int other = pack.ReadCell();
-// 		int weapon = pack.ReadCell();
+		TeleportEntity(syringe, pos, ang, vel);			//Transport syringe
+	}
+}
 
-// 		float targetPos[3];
-// 		GetEntPropVector(other, Prop_Send, "m_vecOrigin", targetPos);
-// 		int isCrit = 0;
-// 		float damage = 10.0;
-// 		int damagetype = DMG_BULLET;
-// 		Address address = TF2Attrib_GetByDefIndex(weapon,1);
-// 		damage = 10.0;
-// 		if(address != Address_Null) damage *= TF2Attrib_GetValue(address);
-// 		if(isKritzed(owner))
-// 		{
-// 			isCrit = 1;
-// 		}
-// 		else
-// 		{
-// 			float dist = getPlayerDistance(owner,other);
-// 			if(dist<512) damage *= 1.0 + 0.2*(512-dist)/512;
-// 			if(!isMiniKritzed(owner,other))
-// 			{
-// 				if(dist>512)
-// 					damage *= 1.0 - 0.50*(dist > 1024.0 ? 1024.0 : dist)/1024;
-// 			}
-// 		}
-// 		damagetype = DMG_BULLET;
-// 		if (isCrit!=0) damagetype |= DMG_CRIT;
+void needleSpawn(int entity)
+{
+	int weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
+	int wepIndex = -1;
+	if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	
+	int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+	bool kritzed = isKritzed(owner);
+	SetEntPropFloat(entity, Prop_Data, "m_flGravity", 0.3);
+	SetEntPropFloat(entity, Prop_Data, "m_flRadius", 0.3);
+	if(wepIndex==36) SetEntityModel(entity, "models/weapons/c_models/c_leechgun/c_leech_proj.mdl");
+	else SetEntityModel(entity, "models/weapons/w_models/w_syringe_proj.mdl");
 
-// 		SDKHooks_TakeDamage(other, owner, owner, damage, damagetype, weapon, NULL_VECTOR, targetPos);
-// 		CreateTimer(0.01,deleteNeedle,entity);
-// 	}
-// 	return Plugin_Continue;
-// }
+	int team = GetEntProp(entity, Prop_Send, "m_iTeamNum");
+	float ang[3];
+	GetEntPropVector(entity, Prop_Data, "m_angRotation", ang);
+	ang[0] = DegToRad(ang[0]); ang[1] = DegToRad(ang[1]); ang[2] = DegToRad(ang[2]);
+	if(team == 2)
+	{
+		if (kritzed) CreateParticle(entity,"nailtrails_medic_red_crit",1.0,ang[0],ang[1],_,_,_,_,_,false);
+		else CreateParticle(entity,"nailtrails_medic_red",1.0,ang[0],ang[1],_,_,_,_,_,false);
+	}
+	if(team == 3)
+	{
+		if (kritzed) CreateParticle(entity,"nailtrails_medic_blue_crit",1.0,ang[0],ang[1],_,_,_,_,_,false);
+		else CreateParticle(entity,"nailtrails_medic_blue",1.0,ang[0],ang[1],_,_,_,_,_,false);
+	}
 
-// Action deleteNeedle(Handle timer,int entity) //delete needles on world
-// {
-// 	if(IsValidEdict(entity))
-// 		AcceptEntityInput(entity,"Kill");
-// 	return Plugin_Continue;
-// }
+	SDKHook(entity, SDKHook_StartTouch, needleTouch);
+}
+
+Action needleTouch(int entity, int other)
+{
+	int weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
+	int wepIndex = -1;
+	if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	switch(wepIndex)
+	{
+		case 17,204,36,412:
+		{
+			int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+			if (other >= 1 && other <= MaxClients)
+			{
+				if(TF2_GetClientTeam(owner) != TF2_GetClientTeam(other))
+				{
+					float targetPos[3];
+					GetEntPropVector(other, Prop_Send, "m_vecOrigin", targetPos);
+					// SDKHooks_TakeDamage(other, owner, owner, 0.001, DMG_BULLET, weapon, NULL_VECTOR, targetPos);
+				}
+				else
+				{
+					return Plugin_Handled;
+				}
+			}
+			else if (other == 0)
+			{
+				CreateParticle(entity,"impact_metal",1.0,_,_,_,_,_,_,false);
+			}
+		}
+	}
+	return Plugin_Continue;
+}
 
 Action flareTouch(int entity, int other)
 {
