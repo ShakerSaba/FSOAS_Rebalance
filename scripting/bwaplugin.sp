@@ -390,7 +390,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				TF2Attrib_SetByDefIndex(primary,3,0.5); //clip size penalty
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, 2, _, true);
-				TF2Attrib_SetByDefIndex(primary,96,1.33); //Reload time increased
+				TF2Attrib_SetByDefIndex(primary,96,1.50); //Reload time increased
 				TF2Attrib_SetByDefIndex(primary,114,1.0); //mini-crit airborne
 				TF2Attrib_SetByDefIndex(primary,137,1.0); //dmg bonus vs buildings
 			}
@@ -1211,7 +1211,7 @@ public void OnGameFrame()
 				// 		TF2Attrib_SetByDefIndex(primary,420,toggle);
 				// 	}
 				// }
-				case 308: //loch n load reload
+				case 308: //loch-n-load reload
 				{
 					if(GetEntProp(primary, Prop_Send, "m_iReloadMode")==2)
 					{
@@ -2422,9 +2422,15 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						distance = 1440.0; //distance for moonshot
 						if(!(damagetype & DMG_CRIT))
 						{
-							damage *= 3.0;
 							damagetype |= DMG_CRIT;
 						}
+					}
+					if(damagetype & DMG_CRIT)
+					{
+						if(isMiniKritzed(attacker,victim) && distance<1440.0)
+							damage = 20.0;
+						else
+							damage = 45.0;
 					}
 					float duration = 0.1 + RoundToNearest(distance/72.0)/4.0; //round to nearest quarter second. range of 0-5
 					if(duration>=1.0)
