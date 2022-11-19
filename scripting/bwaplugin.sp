@@ -313,8 +313,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Liberty Launcher
 			case 414:
 			{
-				TF2Attrib_SetByDefIndex(primary,1,0.8); //damage penalty
-				TF2Attrib_SetByDefIndex(primary,135,0.8); //rocket jump damage reduction
+				// TF2Attrib_SetByDefIndex(primary,1,0.8); //damage penalty
+				// TF2Attrib_SetByDefIndex(primary,135,0.8); //rocket jump damage reduction
 				TF2Attrib_SetByDefIndex(primary,6,0.85); //firing speed bonus
 			}
 			//The Pomson 6000
@@ -390,7 +390,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				TF2Attrib_SetByDefIndex(primary,3,0.5); //clip size penalty
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, 2, _, true);
-				TF2Attrib_SetByDefIndex(primary,96,1.25); //Reload time increased
+				TF2Attrib_SetByDefIndex(primary,96,1.33); //Reload time increased
 				TF2Attrib_SetByDefIndex(primary,114,1.0); //mini-crit airborne
 				TF2Attrib_SetByDefIndex(primary,137,1.0); //dmg bonus vs buildings
 			}
@@ -475,6 +475,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			{
 				TF2Attrib_SetByDefIndex(secondary,410,1.5); //damage bonus while disguised
 				TF2Attrib_SetByDefIndex(secondary,253,0.5); //mult cloak rate
+				TF2Attrib_SetByDefIndex(secondary,221,1.25); //mult decloak rate
 			}
 			//Buffalo Steak Sandvich
 			case 311:
@@ -1150,11 +1151,6 @@ public void OnGameFrame()
 						if(sequence == 23 && weaponState == 0)
 						{
 							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33);
-							g_airTime[iClient] += 1.0/66;
-						}
-						else
-						{
-							g_airTime[iClient] = 0.0;
 						}
 					}
 				}
@@ -1198,23 +1194,23 @@ public void OnGameFrame()
 				// 		SetEntProp(iClient, Prop_Send, "m_iFOV", g_Fov[iClient]);
 				// 	}
 				// }
-				case 811,832: //cooldown on toggle for huo long heater
-				{
-					Address addr = TF2Attrib_GetByDefIndex(primary,420);
-					float toggle = 0.0;
-					if(addr != Address_Null)
-						toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,420));
-					if (toggle > 0 && toggle != 1.0)
-					{
-						toggle = toggle > 0.95 ? 1.0 : toggle + 0.02;
-						TF2Attrib_SetByDefIndex(primary,420,toggle);
-					}
-					else if (toggle < 0 && toggle != -1.0)
-					{
-						toggle = toggle < -0.95 ? -1.0 : toggle - 0.02;
-						TF2Attrib_SetByDefIndex(primary,420,toggle);
-					}
-				}
+				// case 811,832: //cooldown on toggle for huo long heater
+				// {
+				// 	Address addr = TF2Attrib_GetByDefIndex(primary,420);
+				// 	float toggle = 0.0;
+				// 	if(addr != Address_Null)
+				// 		toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,420));
+				// 	if (toggle > 0 && toggle != 1.0)
+				// 	{
+				// 		toggle = toggle > 0.95 ? 1.0 : toggle + 0.02;
+				// 		TF2Attrib_SetByDefIndex(primary,420,toggle);
+				// 	}
+				// 	else if (toggle < 0 && toggle != -1.0)
+				// 	{
+				// 		toggle = toggle < -0.95 ? -1.0 : toggle - 0.02;
+				// 		TF2Attrib_SetByDefIndex(primary,420,toggle);
+				// 	}
+				// }
 				case 308: //loch n load reload
 				{
 					if(GetEntProp(primary, Prop_Send, "m_iReloadMode")==2)
@@ -1824,21 +1820,30 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					{
 					//toggle for huo long heater
 					int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-					if((buttons & IN_RELOAD) == IN_RELOAD && weaponState > 1)
+					if((buttons & IN_RELOAD) && !(g_LastButtons[iClient] & IN_RELOAD) && weaponState > 1)
 					{
-						if(TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,420))==-1.0)
+						float toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,420));
+						if(toggle==-1.0)
 						{
 							EmitSoundToClient(iClient,"weapons/samurai/tf_marked_for_death_indicator.wav");
-							TF2Attrib_SetByDefIndex(primary,420,0.02);
+							TF2Attrib_SetByDefIndex(primary,420,1.0);
 							TF2Attrib_SetByDefIndex(primary,430,0.0);
-							TF2Attrib_SetByDefIndex(primary,431,0.0);
-						}else if(TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,420))==1.0)
+							TF2Attrib_SetByDefIndex(primary,431,0.0);	
+						}
+						else if(toggle==1.0)
 						{
 							EmitSoundToClient(iClient,"weapons/samurai/tf_marked_for_death_indicator.wav");
-							TF2Attrib_SetByDefIndex(primary,420,-0.02);
+							TF2Attrib_SetByDefIndex(primary,420,-1.0);
 							TF2Attrib_SetByDefIndex(primary,430,12.0);
 							TF2Attrib_SetByDefIndex(primary,431,4.0);
 						}
+						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+						g_airTime[iClient] = GetEntProp(iClient, Prop_Data, "m_iAmmo", _, primaryAmmo)+0.0;
+					}
+					if(g_LastButtons[iClient] & IN_RELOAD)
+					{
+						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+						SetEntProp(iClient, Prop_Data, "m_iAmmo", RoundFloat(g_airTime[iClient])-1, _, primaryAmmo);
 					}
 				}
 				if(!(g_LastButtons[iClient] & IN_ATTACK) && buttons & IN_ATTACK && (strcmp(current,"tf_weapon_lunchbox") == 0 || strcmp(current,"Lunch Box") == 0))
@@ -2412,14 +2417,16 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				if(weaponIndex == 44 && inflictor != attacker) //sandman ball
 				{
 					float distance = getPlayerDistance(attacker,victim); //get distance from attacker to victim; couldn't actually find travel time of ball
-					if(distance>=1400.0){
-						distance = 1400.0; //distance for moonshot
-						if(!(damagetype & DMG_CRIT)){
+					if(distance>=1440.0)
+					{
+						distance = 1440.0; //distance for moonshot
+						if(!(damagetype & DMG_CRIT))
+						{
 							damage *= 3.0;
 							damagetype |= DMG_CRIT;
 						}
 					}
-					float duration = 0.1 + RoundToNearest(distance/70.0)/4.0; //round to nearest quarter second. range of 0-5
+					float duration = 0.1 + RoundToNearest(distance/72.0)/4.0; //round to nearest quarter second. range of 0-5
 					if(duration>=1.0)
 						TF2_AddCondition(victim,TFCond_MarkedForDeath,duration); //minimum 1 second, ~300 distance
 					TF2_RemoveCondition(victim,TFCond_Dazed); //no slow (removes of other slow effects but most too situational to worry)
