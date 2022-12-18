@@ -2013,7 +2013,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 							if (IsClientInGame(idx) && idx != iClient) {
 								if (IsPlayerAlive(idx) && GetClientTeam(idx) != GetClientTeam(iClient) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker)) {
 									float distance = getPlayerDistance(iClient,idx);
-									if (distance < 512) {
+									if (distance < 768) {
 										SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
 										CreateTimer(3.0,updateGlow,idx);
 									}
