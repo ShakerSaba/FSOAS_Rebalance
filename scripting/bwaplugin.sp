@@ -37,7 +37,7 @@ float g_holsterMel[MAXPLAYERS+1];
 
 float HOVER_TIME = -2.0;
 float PARACHUTE_TIME = 6.0;
-int KUNAI_MAX = 210;
+int KUNAI_MAX = 190;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
 #define TF_CONDFLAG_VACCMAX      	(1 << 2)
@@ -317,7 +317,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 							SetEntData(primary, iAmmoTable, 6, 4, true);
 							SetEntProp(primary, Prop_Send, "m_iClip1",6);
 						}
-						case 526: //Machina clip penalty
+						case 526, 30665: //Machina clip penalty
 						{	
 							SetEntData(primary, iAmmoTable, 3, 4, true);
 							SetEntProp(primary, Prop_Send, "m_iClip1",3);
@@ -351,12 +351,32 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			{
 				TF2Attrib_SetByDefIndex(iClient,26,15.0); //max health additive bonus
 				TF2Attrib_SetByDefIndex(iClient,83,0.82); //cloak consume rate decreased
-				TF2Attrib_SetByDefIndex(iClient,253,1.0); //mult cloak rate
+				TF2Attrib_SetByDefIndex(iClient,253,0.5); //mult cloak rate
 				// if(secondaryIndex!=61 && secondaryIndex!=1006)
 				// {
 				// 	TF2Attrib_SetByDefIndex(secondary,51,1.0); //revolver use hit locations
 				// }
 			}
+		}
+
+		//Panic Attack
+		if(secondaryIndex == 1153 || primaryIndex == 1153)
+		{
+			int wep = secondaryIndex == 1153 ? secondary : primary;
+			TF2Attrib_SetByDefIndex(wep,6,0.67); //firing speed bonus
+			TF2Attrib_SetByDefIndex(wep,3,0.66); //clip size penalty
+			// TF2Attrib_SetByDefIndex(wep,1,0.85); //damage penalty
+			// TF2Attrib_SetByDefIndex(wep,106,0.85); //weapon spread bonus
+			int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+			SetEntData(wep, iAmmoTable, 4, _, true);
+		}
+		//Reserve Shooter
+		if(secondaryIndex == 415)
+		{
+			TF2Attrib_SetByDefIndex(secondary,3,0.5); //clip size penalty
+			int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+			SetEntData(secondary, iAmmoTable, 3, _, true);
+			TF2Attrib_SetByDefIndex(secondary,106,0.75); //weapon spread bonus
 		}
 
 		switch(primaryIndex)
@@ -448,7 +468,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 41:
 			{
 				TF2Attrib_SetByDefIndex(primary,32,0.0); //slow on hit
-				TF2Attrib_SetByDefIndex(primary,1,0.80); //damage penalty
+				// TF2Attrib_SetByDefIndex(primary,1,0.80); //damage penalty
 				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
 				TF2Attrib_SetByDefIndex(primary,69,0.25); //health from healers reduced
 				TF2Attrib_SetByDefIndex(primary,76,1.5); //maxammo primary increased
@@ -492,7 +512,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				TF2Attrib_SetByDefIndex(primary,135,0.75); //rocket jump damage reduction
 			}
 			//The Machina
-			case 526:
+			case 526,30665:
 			{
 				TF2Attrib_SetByDefIndex(primary,304,1.0); //sniper full charge damage bonus
 				TF2Attrib_SetByDefIndex(primary,266,1.0); //projectile penetration
@@ -761,8 +781,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 								case 356:
 								{
 									TF2Attrib_SetByDefIndex(melee,217,0.0); //sanguisuge
-									TF2Attrib_SetByDefIndex(melee,125,-70.0); //max health additive penalty
-									SetEntityHealth(iClient,70);
+									TF2Attrib_SetByDefIndex(melee,125,-45.0); //max health additive penalty
+									SetEntityHealth(iClient,95);
 								}
 								//The Spy-cicle
 								case 649:
@@ -823,10 +843,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					//Tribalman's shiv
 					case 171:
 					{
-						TF2Attrib_SetByDefIndex(melee,1,0.65); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,149,6.0); //bleeding duration
+						TF2Attrib_SetByDefIndex(melee,149,8.0); //bleeding duration
 						TF2Attrib_SetByDefIndex(melee,877,2.0); //speed boost on hit enemy
-						TF2Attrib_SetByDefIndex(melee,204,1.0); //hit self on miss
 						TF2Attrib_SetByDefIndex(melee,797,1.0); //dmg pierces resists absorbs
 					}
 					//Fan O'War
@@ -988,13 +1006,16 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					{
 						//get health of user before death, can be calculated since backstab does 6x current health in damage
 						float health = GetClientHealth(victim)/-5.0;
-						//bind amount gained between 75 and 210
-						health = health > 210 ? 210.0 : health < 75 ? 75.0 : health;
+						//bind amount gained between 45 and 190
+						health = health < 45 ? 45.0 : health > KUNAI_MAX ? KUNAI_MAX+0.0 : health;
+						// health = health < 45 ? 45.0 : health;
+						// health = GetClientHealth(attacker) + health > KUNAI_MAX ? KUNAI_MAX - GetClientHealth(attacker) + 0.0 : health;
 						DataPack pack = new DataPack();
 						pack.Reset();
 						pack.WriteCell(attacker);
 						pack.WriteFloat(health);
 						CreateTimer(0.09,KunaiTimer,pack,TIMER_REPEAT);
+						// TF2Util_TakeHealth(attacker,health,TAKEHEALTH_IGNORE_MAXHEALTH);
 					}
 				}
 				case 649: //Spy-Cicle on kill
@@ -1002,8 +1023,8 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					if(customKill == TF_CUSTOM_BACKSTAB)
 					{
 						float meter = GetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",2); //durability meter
-						if (meter-50 > 0)
-							SetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",meter-50.0,2);
+						if (meter-67 > 0)
+							SetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",meter-67.0,2);
 						else
 							MeltKnife(attacker,melee,10.0);
 					}
@@ -1281,14 +1302,20 @@ public void OnGameFrame()
 				}
 				case TFClass_Heavy:
 				{
+					//speed up minigun spin-down
 					if(primary != -1)
 					{
 						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
 						int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
 						int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
+						float cycle = GetEntPropFloat(view, Prop_Data, "m_flCycle");
 						if(sequence == 23 && weaponState == 0)
 						{
-							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33);
+							if(cycle < 0.15) //set idle time faster
+							{
+								SetEntPropFloat(primary, Prop_Send, "m_flTimeWeaponIdle",GetGameTime()+0.4);
+							}
+							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33); //speed up animation
 						}
 					}
 				}
@@ -1484,19 +1511,19 @@ public void OnGameFrame()
 						TF2Util_SetPlayerBurnDuration(iClient,burntime);
 					}
 				}
-				case 356: //speed up overheal decay of Kunai
-				{
-					int health = GetEntProp(iClient, Prop_Data,"m_iHealth");
-					if(health > 105)
-					{
-						g_airTime[iClient] += 0.015;
-						if(g_airTime[iClient] > 0.015*21)
-						{
-							SetEntityHealth(iClient,health-1);
-							g_airTime[iClient] = 0.0;
-						}
-					}
-				}
+				// case 356: //speed up overheal decay of Kunai
+				// {
+				// 	int health = GetEntProp(iClient, Prop_Data,"m_iHealth");
+				// 	if(health > 105)
+				// 	{
+				// 		g_airTime[iClient] += 0.015;
+				// 		if(g_airTime[iClient] > 0.015*21)
+				// 		{
+				// 			SetEntityHealth(iClient,health-1);
+				// 			g_airTime[iClient] = 0.0;
+				// 		}
+				// 	}
+				// }
 			}
 		}
 	} 
@@ -1783,7 +1810,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				if(primaryIndex == 230) reloadSpeed=1.5;
 				int maxClip = 4;
 				if(primaryIndex==1098) maxClip=6;
-				else if(primaryIndex==526) maxClip=3;
+				else if(primaryIndex==526 || primaryIndex==30665) maxClip=3;
 
 				if(curr==primary)
 				{
@@ -2082,14 +2109,34 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						EmitAmbientSound("ui/cyoa_ping_in_progress.wav",position,iClient,SNDLEVEL_MINIBIKE,_,2.5);
 						SetEntProp(iClient, Prop_Send, "m_bGlowEnabled", 1);
 						CreateTimer(3.0,updateGlow,iClient);
-						int idx;
-						for (idx = 1; idx < MaxClients; idx++) {
-							if (IsClientInGame(idx) && idx != iClient) {
-								if (IsPlayerAlive(idx) && GetClientTeam(idx) != GetClientTeam(iClient) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker)) {
-									float distance = getPlayerDistance(iClient,idx);
-									if (distance < 768) {
-										SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
-										CreateTimer(3.0,updateGlow,idx);
+						int idx, currEnts = GetEntityCount();
+						for (idx = 1; idx < currEnts; idx++) {
+							if(idx<=MaxClients) //find enemy players
+							{
+								if (IsClientInGame(idx) && idx != iClient) {
+									if (IsPlayerAlive(idx) && GetClientTeam(idx) != GetClientTeam(iClient) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker)) {
+										float distance = getPlayerDistance(iClient,idx);
+										if (distance < 768) {
+											SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
+											CreateTimer(3.0,updateGlow,idx);
+										}
+									}
+								}
+							}
+							else //find enemy buildings
+							{
+								if(IsValidEntity(idx))
+								{
+									char class[64];
+									GetEntityClassname(idx,class,64);
+									if(StrEqual(class,"obj_sentrygun") || StrEqual(class,"obj_teleporter") || StrEqual(class,"obj_dispenser"))
+									{
+										float distance = getPlayerDistance(iClient,idx);
+										if(GetEntProp(iClient, Prop_Send,"m_iTeamNum") != GetEntProp(idx, Prop_Send,"m_iTeamNum") && distance < 768)
+										{
+											SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
+											CreateTimer(3.0,updateGlow,idx);
+										}
 									}
 								}
 							}
@@ -2204,6 +2251,30 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						CreateParticle(iClient,"heavy_ring_of_fire",2.0,_,_,_,_,5.0,_,false,false);
 						CreateParticle(iClient,"superrare_burning1",5.0,_,_,_,_,_,_,false,false);
 						// CreateTimer(0.5,SOASFlare,iClient);
+					}
+				}
+			}
+		}
+		//funny panic attack
+		if(secondaryIndex == 1153 || primaryIndex == 1153)
+		{
+			int wep = secondaryIndex == 1153 ? secondary : primary;
+			if(curr==wep)
+			{
+				if(g_condFlags[iClient] & TF_CONDFLAG_INFIRE)
+				{
+					buttons |= IN_ATTACK;
+					weapon = 0;
+					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+					int clip = GetEntData(wep, iAmmoTable, 4);
+					if(clip==0 || !IsPlayerAlive(iClient))
+						g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
+				}
+				else
+				{
+					if(buttons & IN_ATTACK)
+					{
+						g_condFlags[iClient] |= TF_CONDFLAG_INFIRE;
 					}
 				}
 			}
@@ -2422,27 +2493,27 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 		}
 		return Plugin_Stop;
 	}
-	if(damagetype & DMG_CLUB && GetClientTeam(victim) != GetClientTeam(attacker)) //melee parry
-	{
-		if(g_condFlags[victim] & TF_CONDFLAG_INMELEE)
-		{
-			PrintToChat(victim,"Parry?");
-			if(GetClientAimTarget(victim)==attacker)
-			{
-				if(g_consecHits[victim]==-1) g_consecHits[victim] = -3;
-				else g_consecHits[victim] = -2;
-				g_condFlags[victim] &= ~TF_CONDFLAG_INMELEE;
-				g_condFlags[attacker] &= ~TF_CONDFLAG_INMELEE;
-				PrintToChat(victim,"YOU PARRY! :)");
-				PrintToChat(attacker,"PARRIED! :(");
-			}
-			else
-			{
-				PrintToChat(victim,"MISSED PARRY! :(");
-				PrintToChat(attacker,"NOT PARRIED! :)");
-			}
-		}
-	}
+	// if(damagetype & DMG_CLUB && GetClientTeam(victim) != GetClientTeam(attacker)) //melee parry
+	// {
+	// 	if(g_condFlags[victim] & TF_CONDFLAG_INMELEE)
+	// 	{
+	// 		PrintToChat(victim,"Parry?");
+	// 		if(GetClientAimTarget(victim)==attacker)
+	// 		{
+	// 			if(g_consecHits[victim]==-1) g_consecHits[victim] = -3;
+	// 			else g_consecHits[victim] = -2;
+	// 			g_condFlags[victim] &= ~TF_CONDFLAG_INMELEE;
+	// 			g_condFlags[attacker] &= ~TF_CONDFLAG_INMELEE;
+	// 			PrintToChat(victim,"YOU PARRY! :)");
+	// 			PrintToChat(attacker,"PARRIED! :(");
+	// 		}
+	// 		else
+	// 		{
+	// 			PrintToChat(victim,"MISSED PARRY! :(");
+	// 			PrintToChat(attacker,"NOT PARRIED! :)");
+	// 		}
+	// 	}
+	// }
 	//TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.02);
 	return Plugin_Changed;
 }
@@ -2551,15 +2622,8 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						damagetype = DMG_SHOCK;
 						damage = 20.0;
 					}
-						else damage *= 0.0; 
-				}
-				case 171: //trigger bleed on shiv
-				{
-					if(damagetype & DMG_CLUB)
-					{
-						TF2_AddCondition(victim,TFCond_Bleeding,6.0,inflictor);
-						TF2_AddCondition(victim,TFCond_SpeedBuffAlly,2.0,inflictor);
-					}
+					else
+						damage *= 0.0; 
 				}
 			}
 		}
@@ -3011,13 +3075,13 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		else if(TF2_IsPlayerInCondition(attacker,TFCond_SmallBlastResist) && damagetype & DMG_BLAST)
 			damage *= 1.1;
 
-		if(damagetype & DMG_BURN){ //scale afterburn damage with burning time
-			float burnTime = TF2Util_GetPlayerBurnDuration(victim);
-			if(burnTime > 7) damage *= 1.5;
-			else if(burnTime > 5) damage *= 1.25;
-			else if(burnTime > 3) damage *= 1.0;
-			else damage *= 0.75;
-		}
+		// if(damagetype & DMG_BURN){ //scale afterburn damage with burning time
+		// 	float burnTime = TF2Util_GetPlayerBurnDuration(victim);
+		// 	if(burnTime > 7) damage *= 1.5;
+		// 	else if(burnTime > 5) damage *= 1.25;
+		// 	else if(burnTime > 3) damage *= 1.0;
+		// 	else damage *= 0.75;
+		// }
 
 		//calculate vaccinator resistance
 		float vacResistance = 1.0;
@@ -3528,7 +3592,8 @@ public Action WeaponSwitch(int iClient, int weapon)
 }
 
 public Action updateGlow(Handle timer, int client){ //radar glow
-	SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
+	if(IsValidEntity(client))
+		SetEntProp(client, Prop_Send, "m_bGlowEnabled", 0);
 	return Plugin_Continue;
 }
 
@@ -3657,7 +3722,7 @@ public Action KunaiTimer(Handle timer, DataPack pack)
 		if(IsPlayerAlive(client) && health > 0)
 		{
 			int curr = GetClientHealth(client);
-			float amount = health >= 13 ? 13.0 : health;
+			float amount = health >= 11 ? 11.0 : health;
 			health -= amount;
 			if(curr+amount>KUNAI_MAX)
 			{
