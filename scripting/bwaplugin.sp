@@ -155,6 +155,7 @@ public void OnMapStart()
 	PrecacheSound("weapons/vaccinator_toggle.wav",true);
 	PrecacheSound("misc/halloween/spell_overheal.wav",true);
 	PrecacheSound("mvm/giant_soldier/giant_soldier_explode.wav",true);
+	PrecacheSound("misc/halloween/spell_skeleton_horde_cast.wav",true);
 	PrecacheModel("models/weapons/w_models/w_syringe_proj.mdl",true);
 	PrecacheModel("models/weapons/c_models/c_leechgun/c_leech_proj.mdl",true);
 	if (GameRules_GetProp("m_bPlayingMannVsMachine"))
@@ -208,6 +209,10 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 		else if(StrEqual(classname,"tf_flame_manager"))
 		{
 			SDKHook(iEnt, SDKHook_Touch, FlameTouch);
+		}
+		else if(StrEqual(classname, "tf_projectile_arrow")) //syringe
+		{
+			SDKHook(iEnt, SDKHook_StartTouch, arrowTouch);
 		}
 		// else if(StrContains(classname,"tf_weapon") != -1 || StrContains(classname,"saxxy") != -1 || StrContains(classname,"tf_wearable") != -1)
 		// {
@@ -938,6 +943,14 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						g_holsterMel[iClient] = 2.0;
 						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
 					}
+					//spooky
+					case 939:
+					{
+						TF2Attrib_SetByDefIndex(melee,2,1.25); //damage bonus
+						TF2Attrib_SetByDefIndex(melee,547,0.75); //deploy speed bonus
+						g_holsterMel[iClient] = 2.0;
+						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
+					}
 				}
 			}
 		}
@@ -1038,14 +1051,17 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					CreateParticle(victim,"ExplosionCore_MidAir_Flare",5.0,_,_,_,_,100.0,1.5,false);
 					for (int i = 1 ; i <= MaxClients ; i++)
 					{
-						if(IsClientInGame(i))
+						if(IsClientInGame(i) && i!=victim)
 						{
-							GetEntPropVector(i, Prop_Send, "m_vecOrigin", targetPos);
-							float dist = GetVectorDistance(victimPos,targetPos);
-							if(victim != i && dist<=146 && TF2_GetClientTeam(i) != TF2_GetClientTeam(attacker))
+							if(IsPlayerAlive(i))
 							{
-								SDKHooks_TakeDamage(i, attacker, attacker, 15.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos);
-								if(TF2_GetPlayerClass(i) != TFClass_Pyro) TF2Util_SetPlayerBurnDuration(i,4.0);
+								GetEntPropVector(i, Prop_Send, "m_vecOrigin", targetPos);
+								float dist = GetVectorDistance(victimPos,targetPos);
+								if(victim != i && dist<=146 && TF2_GetClientTeam(i) != TF2_GetClientTeam(attacker))
+								{
+									SDKHooks_TakeDamage(i, attacker, attacker, 15.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos);
+									if(TF2_GetPlayerClass(i) != TFClass_Pyro) TF2Util_SetPlayerBurnDuration(i,4.0);
+								}
 							}
 						}
 					}
@@ -1097,8 +1113,18 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 						MeltKnife(attacker,melee,10.0);
 				}
 			}
+			case 939: //spooky skeleton
+			{
+				RequestFrame(SpawnSpooky,victim);
+			}
 		}
 		
+		int victimMelee = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Melee, true);
+		int victimMeleeIndex = -1;
+		if(victimMelee >= 0) victimMeleeIndex = GetEntProp(victimMelee, Prop_Send, "m_iItemDefinitionIndex");
+		if(victimMeleeIndex==939 && attacker!=victim){
+			RequestFrame(SpawnSpooky,victim);
+		}
 	}
 	
 	if(g_condFlags[victim] & TF_CONDFLAG_VOLCANO) //sharpened volcano, if player hit while burning dies they explode
@@ -2677,8 +2703,8 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 public void OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype, int weapon, const float damageForce[3], const float damagePosition[3], int damagecustom)
 {
 	TFClassType tfVictimClass = TF2_GetPlayerClass(victim);
-	int weaponIndex = -1;
-	if(weapon > 0) weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	// int weaponIndex = -1;
+	// if(weapon > 0) weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 
 	//explode on ignite for single target
 	if(TF2_IsPlayerInCondition(victim,TFCond_Gas) && (damagetype & DMG_BURN || damagetype & DMG_CLUB || damagetype & DMG_IGNITE || damagetype & DMG_BLAST || damagetype & DMG_BUCKSHOT || damagetype & DMG_BULLET))
@@ -4804,34 +4830,6 @@ Action needleTouch(int entity, int other)
 	return Plugin_Continue;
 }
 
-// Action needleOnTouch(int entity, int other)
-// {
-// 	float vel[3],ang[3],pos[3];
-// 	// int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-// 	GetEntPropVector(entity, Prop_Send, "m_angRotation", ang);
-// 	GetEntPropVector(entity, Prop_Send, "m_vecOrigin", pos);
-// 	// vel[0] = Cosine(DegToRad(ang[0]))*Cosine(DegToRad(ang[1]))*1400.0;
-// 	// vel[1] = Cosine(DegToRad(ang[0]))*Sine(DegToRad(ang[1]))*1400.0;
-// 	// vel[2] = Sine(DegToRad(ang[0]))*-1400.0;
-// 	// PrintToChat(owner,"%.2f %.2f %.2f|%.2f %.2f %.2f",ang[0],ang[1],ang[2],vel[0],vel[1],vel[2]);
-// 	pos[0]+vel[0]*0.3; pos[1]+vel[1]*0.3; pos[2]+vel[2]*0.3;
-// 	TeleportEntity(entity, pos, ang, vel);
-// 	SetEntPropVector(entity, Prop_Data, "m_vecAbsVelocity", pos);
-// 	SetEntDataVector(entity, 572, vel, true); //m_vecAbsVelocity
-// 	// SetEntPropVector(entity, Prop_Data, "m_vecAbsOrigin", pos);
-// 	// SetEntDataVector(entity, 676, pos, true); //m_vecAbsOrigin
-// 	// SetEntPropVector(entity, Prop_Data, "m_vecOrigin", pos);
-// 	// SetEntDataVector(entity, 812, pos, true); //m_vecOrigin
-// 	if(GetEntProp(entity, Prop_Data, "m_iHealth")!=1)
-// 	{
-// 		SetEntProp(entity, Prop_Data, "m_iHealth",1);
-// 		CreateTimer(3.0,KillOrb,entity);
-// 	}
-// 	SetEntPropFloat(entity, Prop_Data, "m_flGravity", 0.0);
-// 	SetEntDataFloat(entity, 648, 0.0, true); //m_flGravity
-// 	return Plugin_Handled;
-// }
-
 Action flareTouch(int entity, int other)
 {
 	char class[64];
@@ -4998,20 +4996,43 @@ Action KillOrb(Handle timer, int flare)
 	return Plugin_Continue;
 }
 
-// Action projSpawn(int entity){
-// 	int col = GetEntProp(entity, Prop_Data, "m_CollisionGroup");
-// 	int sol = GetEntProp(entity, Prop_Data, "m_usSolidFlags");
-// 	int sot = GetEntProp(entity, Prop_Data, "m_nSolidType");
-// 	float grav = GetEntPropFloat(entity, Prop_Data, "m_flGravity");
-// 	PrintToChatAll("%d %d %d %.2f",col,sol,sot,grav);
-// 	int mov1 = GetEntProp(entity, Prop_Data, "m_MoveType");
-// 	int mov2 = GetEntProp(entity, Prop_Data, "m_MoveCollide");
-// 	int mov3 = GetEntProp(entity, Prop_Send, "movetype");
-// 	int mov4 = GetEntProp(entity, Prop_Send, "movecollide");
-// 	float rad = GetEntPropFloat(entity, Prop_Data, "m_flRadius");
-// 	PrintToChatAll("%d %d %d %d %.2f",mov1,mov2,mov3,mov4,rad);
+Action arrowTouch(int entity, int other)
+{
+	if(IsValidClient(other))
+	{
+		SDKHook(entity, SDKHook_Touch, arrowOnTouch);
+		return Plugin_Handled;
+	}
+	return Plugin_Continue;
+}
 
-// 	return Plugin_Continue;
+Action arrowOnTouch(int entity, int other)
+{
+	return Plugin_Stop;
+}
+
+// Action projSpawn(int entity){
+// 	// int col = GetEntProp(entity, Prop_Send, "m_CollisionGroup");
+// 	// int sol = GetEntProp(entity, Prop_Send, "m_usSolidFlags");
+// 	// int sot = GetEntProp(entity, Prop_Send, "m_nSolidType");
+// 	// float grav = GetEntPropFloat(entity, Prop_Data, "m_flGravity");
+// 	// PrintToChatAll("%d %d %d %.2f",col,sol,sot,grav);
+// 	// int mov1 = GetEntProp(entity, Prop_Data, "m_MoveType");
+// 	// int mov2 = GetEntProp(entity, Prop_Data, "m_MoveCollide");
+// 	// int mov3 = GetEntProp(entity, Prop_Send, "movetype");
+// 	// int mov4 = GetEntProp(entity, Prop_Send, "movecollide");
+// 	// float rad = GetEntPropFloat(entity, Prop_Data, "m_flRadius");
+// 	// PrintToChatAll("%d %d %d %d %.2f",mov1,mov2,mov3,mov4,rad);
+
+// 	char classname[64];
+// 	GetEntityClassname(entity,classname,64);
+// 	if((StrContains(classname,"arrow") != -1))
+// 	{
+// 		SetEntProp(entity, Prop_Send, "m_CollisionGroup",0);
+// 		SetEntProp(entity, Prop_Data, "m_CollisionGroup",0);
+// 		SetEntData(entity,560,0,_,true);
+// 	}
+// 	return Plugin_Changed;
 // }
 
 void orbSpawn(int entity)
@@ -5115,6 +5136,41 @@ public Action resetMelt(Handle timer, int iClient)
 			g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
 			return Plugin_Stop;
 		}
+	}
+	return Plugin_Continue;
+}
+
+public void SpawnSpooky(int victim)
+{
+	int skeleton = CreateEntityByName("tf_zombie");
+	if(IsValidEntity(skeleton))
+	{
+		DispatchKeyValue(skeleton, "targetname", "tf_zombie");
+		int team = GetEntProp(victim, Prop_Send, "m_iTeamNum")==3 ? 2 : 3;
+		SetEntProp(skeleton, Prop_Send, "m_iTeamNum", team);
+		if(team==2)
+		{
+			DispatchKeyValue(skeleton, "skin", "0");
+		}
+		else
+		{
+			DispatchKeyValue(skeleton, "skin", "1");
+		}
+		float victimPos[3];
+		GetEntPropVector(victim, Prop_Send, "m_vecOrigin", victimPos);
+		TeleportEntity(skeleton, victimPos, NULL_VECTOR, NULL_VECTOR);
+		DispatchSpawn(skeleton);
+		EmitAmbientSound("misc/halloween/spell_skeleton_horde_cast.wav",victimPos,skeleton);
+		CreateTimer(20.0,KillSpooky,skeleton);
+	}
+}
+
+public Action KillSpooky(Handle timer, int skeleton)
+{
+	//reset afterburn immunity on spy-cicle
+	if (IsValidEntity(skeleton))
+	{
+		AcceptEntityInput(skeleton,"Kill");
 	}
 	return Plugin_Continue;
 }
