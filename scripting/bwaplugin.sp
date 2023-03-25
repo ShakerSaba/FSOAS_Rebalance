@@ -265,6 +265,7 @@ public Action LogGameMessage(const char[] message)
 				strcopy(id,MAX_NAME_LENGTH,vicid[idStartPos]);
 				id[idEndPos-idStartPos] = 0;
 				int victim = GetClientOfUserId(StringToInt(id));
+				TF2Util_TakeHealth(user,10.0);
 				TF2Util_TakeHealth(victim,30.0);
 			}
 			case 58,222,1121,1083,1105: //milk and jarate
@@ -386,7 +387,21 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			// 	TF2Attrib_SetByDefIndex(iClient,107,240.0/230.0); //move speed bonus
 			// 	TF2Attrib_SetByDefIndex(primary,54,0.9); //move speed penalty
 			// 	TF2Attrib_SetByDefIndex(primary,128,1.0); //provide while active
-			// 	TF2Attrib_SetByDefIndex(iClient,86,1.0/0.84); //minigun spinup time increased
+			// 	int current = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
+			// 	if (current==primary)
+			// 	{
+			// 		if(!TF2_IsPlayerInCondition(iClient,TFCond_Slowed))
+			// 			SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",216.0);
+			// 	}
+			// 	else
+			// 	{
+			// 		if (current==melee && meleeIndex==239) SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",312.0);
+			// 		else if (current==melee && meleeIndex==239) SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",276.0);
+			// 		else SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",240.0);
+			// 	}
+
+			// 	// if(primaryIndex != 41 && primaryIndex != 312 && primaryIndex != 424 && primaryIndex != 811 && primaryIndex != 832)
+			// 	// 	TF2Attrib_SetByDefIndex(primary,86,1.0/0.814); //minigun spinup time increased
 			// }
 		}
 
@@ -421,13 +436,15 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Brass Beast
 			case 312:
 			{
+				// TF2Attrib_SetByDefIndex(primary,86,1.4/0.814); //spinup time penalty
 				TF2Attrib_SetByDefIndex(primary,86,1.4); //spinup time penalty
-				TF2Attrib_SetByDefIndex(primary,199,0.8); //holster speed bonus
-				// TF2Attrib_SetByDefIndex(primary,86,1.5); //minigun spinup time increased
+				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
+				// TF2Attrib_SetByDefIndex(primary,199,0.8); //holster speed bonus
 			}
 			//Huo-Long Heater
 			case 811,832:
 			{
+				// TF2Attrib_SetByDefIndex(primary,86,1.0/0.814); //spinup time penalty
 				TF2Attrib_SetByDefIndex(primary,1,1.0); //damage penalty
 				TF2Attrib_SetByDefIndex(primary,21,0.9); //damage penalty vs non-burning players
 				TF2Attrib_SetByDefIndex(primary,795,1.15); //damage bonus vs burning
@@ -498,6 +515,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Natascha
 			case 41:
 			{
+				// TF2Attrib_SetByDefIndex(primary,86,1.25/0.814); //spinup time penalty
 				TF2Attrib_SetByDefIndex(primary,32,0.0); //slow on hit
 				// TF2Attrib_SetByDefIndex(primary,1,0.80); //damage penalty
 				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
@@ -506,7 +524,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 				SetEntProp(iClient, Prop_Data, "m_iAmmo", 300 , _, primaryAmmo);
 				TF2Attrib_SetByDefIndex(primary,110,8.0); //heal on hit for slowfire
-				// TF2Attrib_SetByDefIndex(primary,86,1.35); //minigun spinup time increased
 			}
 			//Bazaar Bargain
 			case 402:
@@ -564,8 +581,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Tomislav
 			case 424:
 			{
+				// TF2Attrib_SetByDefIndex(primary,87,0.7/0.814); //minigun spinup time decreased
 				TF2Attrib_SetByDefIndex(primary,5,1.3); //fire rate penalty
-				// TF2Attrib_SetByDefIndex(primary,87,0.75); //minigun spinup time decreased
 			}
 			//Loose Cannon
 			case 996:
@@ -789,10 +806,13 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					//The Ubersaw
 					case 37,1003:
 					{
-						TF2Attrib_SetByDefIndex(melee,17,0.25); //uber on hit
-						// TF2Attrib_SetByDefIndex(melee,547,0.8); //deploy speed bonus
-						g_holsterMel[iClient] = 1.5;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
+						TF2Attrib_SetByDefIndex(melee,128,1.0); //provide while active
+						TF2Attrib_SetByDefIndex(melee,5,1.25); //fire rate penalty
+						TF2Attrib_SetByDefIndex(melee,547,0.8); //deploy speed bonus
+						TF2Attrib_SetByDefIndex(melee,412,1.25); //damage taken increased
+						// TF2Attrib_SetByDefIndex(melee,17,0.25); //uber on hit
+						// g_holsterMel[iClient] = 1.5;
+						// TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
 					}
 					//Scotsman's skullcutter
 					case 172:
@@ -1460,7 +1480,7 @@ public void OnGameFrame()
 				}
 				case TFClass_Heavy:
 				{
-					//speed up minigun spin-down
+					//speed up minigun `n
 					if(primary != -1)
 					{
 						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
@@ -1474,7 +1494,18 @@ public void OnGameFrame()
 								SetEntPropFloat(primary, Prop_Send, "m_flTimeWeaponIdle",GetGameTime()+0.4);
 							}
 							SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.33); //speed up animation
+							g_holsterPri[iClient] = 0.66;
+							g_meterPri[iClient] = 0.495;
 						}
+						
+						if(g_meterPri[iClient]>0 && current==primary)
+							g_meterPri[iClient] -= 0.015;
+						else
+						{
+							g_holsterPri[iClient] = 1.0;
+							g_meterPri[iClient] = 0.0;
+						}
+						
 					}
 					switch(secondaryIndex)
 					{
@@ -1733,8 +1764,9 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 		}
 		case TFClass_Heavy:
 		{
-			if(condition == TFCond_CritCola) //steak resistances
+			if(condition == TFCond_CritCola) //steak resistances & duration
 			{
+				time = 20.0;
 				TF2Attrib_SetByDefIndex(iClient,252,0.5);
 				TF2Attrib_SetByDefIndex(iClient,329,0.5);
 			}
@@ -2183,6 +2215,16 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				}
 				if(!(g_LastButtons[iClient] & IN_ATTACK) && buttons & IN_ATTACK && curr == secondary)
 					buffSteak(iClient,clientFlags); //speed up steak eating on attack
+				if(311 == secondaryIndex && TF2_IsPlayerInCondition(iClient,TFCond_CritCola))
+				{
+					if(weapon != 0)
+					{
+						float durr = TF2Util_GetPlayerConditionDuration(iClient,TFCond_CritCola);
+						TF2_AddCondition(iClient,TFCond_MarkedForDeath,durr);
+						TF2_RemoveCondition(iClient,TFCond_CritCola);
+						TF2_RemoveCondition(iClient,TFCond_RestrictToMelee);
+					}
+				}
 			}
 			case TFClass_Engineer:
 			{
@@ -2363,10 +2405,10 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 								SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",300.0);
 							case TFClass_DemoMan:
 								SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",280.0);
-							case TFClass_Soldier:
+							case TFClass_Soldier,TFClass_Heavy:
 								SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",240.0);
-							case TFClass_Heavy:
-								SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",230.0);
+							// case TFClass_Heavy:
+							// 	SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",230.0);
 						}
 					}
 					//fake spy reload
@@ -2635,19 +2677,19 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 					}
 				}
 			}
-			case TFClass_Medic:
-			{
-				int melee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
-				int meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
-				//ubersaw, get meter and modify uber-on-hit
-				if((meleeIndex == 37 || meleeIndex == 1003) && damagetype & DMG_CLUB)
-				{
-					int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
-					float charge = GetEntPropFloat(secondary, Prop_Send,"m_flChargeLevel");
-					charge = charge < 0.5 ? 0.25 : 0.10;
-					TF2Attrib_SetByDefIndex(melee,17,charge); //uber on hit
-				}
-			}
+			// case TFClass_Medic:
+			// {
+			// 	int melee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
+			// 	int meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+			// 	//ubersaw, get meter and modify uber-on-hit
+			// 	if((meleeIndex == 37 || meleeIndex == 1003) && damagetype & DMG_CLUB)
+			// 	{
+			// 		int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+			// 		float charge = GetEntPropFloat(secondary, Prop_Send,"m_flChargeLevel");
+			// 		charge = charge < 0.5 ? 0.25 : 0.10;
+			// 		TF2Attrib_SetByDefIndex(melee,17,charge); //uber on hit
+			// 	}
+			// }
 		}
 	}
 
@@ -3310,6 +3352,19 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				if(meleeIndex == 649 && weaponIndex != 460 && weaponIndex != 171)
 				{
 					if(g_condFlags[victim] & TF_CONDFLAG_INFIRE)
+						damage *= 0.8;
+				}
+			}
+			case TFClass_Heavy:
+			{
+				if(TF2_IsPlayerInCondition(victim,TFCond_Slowed) && weaponIndex != 460 && weaponIndex != 171)
+				{
+					//brass beast resistance
+					int primary = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Primary, true);
+					int primaryIndex = -1;
+					if(primary>0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
+					int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+					if(primaryIndex == 312 && (weaponState == 2 || weaponState == 3))
 						damage *= 0.8;
 				}
 			}
@@ -5064,20 +5119,20 @@ Action KillOrb(Handle timer, int flare)
 	return Plugin_Continue;
 }
 
-Action arrowTouch(int entity, int other)
-{
-	if(IsValidClient(other))
-	{
-		SDKHook(entity, SDKHook_Touch, arrowOnTouch);
-		return Plugin_Handled;
-	}
-	return Plugin_Continue;
-}
+// Action arrowTouch(int entity, int other)
+// {
+// 	if(IsValidClient(other))
+// 	{
+// 		SDKHook(entity, SDKHook_Touch, arrowOnTouch);
+// 		return Plugin_Handled;
+// 	}
+// 	return Plugin_Continue;
+// }
 
-Action arrowOnTouch(int entity, int other)
-{
-	return Plugin_Stop;
-}
+// Action arrowOnTouch(int entity, int other)
+// {
+// 	return Plugin_Stop;
+// }
 
 // Action projSpawn(int entity){
 // 	// int col = GetEntProp(entity, Prop_Send, "m_CollisionGroup");
