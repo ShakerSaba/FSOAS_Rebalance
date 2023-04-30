@@ -5045,7 +5045,7 @@ void AirblastPush(int client)
 {
 	float meter = GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", 0);
 	if(meter<5.0) meter = 100.0;
-	meter *= 2.5;
+	meter *= 2;
 	float force[3],angles[3],vel[3];
 	GetEntPropVector(client, Prop_Data, "m_vecVelocity",vel);
 	GetClientEyeAngles(client,angles);
