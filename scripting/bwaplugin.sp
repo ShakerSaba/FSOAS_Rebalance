@@ -644,11 +644,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Dalokohs Bar
 			case 159, 433:
 			{
-				Address addr = TF2Attrib_GetByDefIndex(secondary,26);
-				if(addr==Address_Null)
+				if(strcmp(event,"player_spawn") == 0)
 					TF2Attrib_SetByDefIndex(secondary,26,0.0); //max health additive bonus
-				else if(TF2Attrib_GetValue(addr)==0.0)
-					g_meterSec[iClient] = 0.0;
 				TF2Attrib_SetByDefIndex(secondary,139,6.0); //set_weapon_mode
 				TF2Attrib_SetByDefIndex(secondary,876,0.8); //lunchbox healing decreased
 				TF2Attrib_SetByDefIndex(secondary,801,15.0); //item_meter_charge_rate
@@ -2993,7 +2990,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 			}
 			case 1103: //Back scatter reload on hit
 			{
-				if(damagetype & DMG_BULLET)
+				if((damagetype & DMG_BUCKSHOT))
 				{
 					float time = GetGameTime();
 					if(g_meterPri[attacker]!=time)
@@ -3542,7 +3539,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		}
 		
 		//vaccinator passive offense bonuses
-		if(TF2_IsPlayerInCondition(attacker,TFCond_SmallBulletResist) && damagetype & DMG_BUCKSHOT)
+		if(TF2_IsPlayerInCondition(attacker,TFCond_SmallBulletResist) && (damagetype & DMG_BUCKSHOT || damagetype & DMG_BULLET))
 			damage *= 1.1;
 		else if(TF2_IsPlayerInCondition(attacker,TFCond_SmallFireResist) && damagetype & DMG_IGNITE)
 			damage *= 1.1;
