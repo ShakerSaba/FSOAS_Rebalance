@@ -2989,17 +2989,20 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 			}
 			case 1103: //Back scatter reload on hit
 			{
-				float time = GetGameTime();
-				if(g_meterPri[attacker]!=time)
+				if(damagetype & DMG_BULLET)
 				{
-					g_meterPri[attacker] = time;
-					int primaryAmmo = GetEntProp(weapon, Prop_Send, "m_iPrimaryAmmoType");
-					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-					if(ammoCount>0)
+					float time = GetGameTime();
+					if(g_meterPri[attacker]!=time)
 					{
-						int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-						SetEntData(weapon, iAmmoTable, 2, _, true);
-						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1 , _, primaryAmmo);
+						g_meterPri[attacker] = time;
+						int primaryAmmo = GetEntProp(weapon, Prop_Send, "m_iPrimaryAmmoType");
+						int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+						if(ammoCount>0)
+						{
+							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							SetEntData(weapon, iAmmoTable, 2, _, true);
+							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1 , _, primaryAmmo);
+						}
 					}
 				}
 			}
