@@ -1639,10 +1639,14 @@ public void OnGameFrame()
 						{
 							if(g_meterSec[iClient]>0)
 								g_meterSec[iClient]-=0.015;
-							else if(g_meterSec[iClient]<0.0)
+							else if(g_meterSec[iClient]<=0.0)
 							{
-								g_meterSec[iClient] = 0.0;
-								TF2Attrib_SetByDefIndex(secondary,26,0.0); //max health additive bonus
+								Address addr = TF2Attrib_GetByDefIndex(secondary,26);
+								if(TF2Attrib_GetValue(addr)!=0.0)
+								{
+									g_meterSec[iClient] = 0.0;
+									TF2Attrib_SetByDefIndex(secondary,26,0.0); //max health additive bonus
+								}
 							}
 						}
 					}
