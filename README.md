@@ -1,7 +1,7 @@
 ## FSOAS Rebalance Plugin
 ### aka "Bad Weapon Rehabilitation"
 
-Changes: http://badweaponrehab.tf/
+Changes: https://badweaponrehab.tf/
 
 ### Dependencies:
 - [TF2Attributes](https://github.com/nosoop/tf2attributes), nosoop fork
