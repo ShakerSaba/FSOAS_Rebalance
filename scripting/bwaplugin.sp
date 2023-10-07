@@ -14,9 +14,11 @@ ConVar g_bApplyClassChangesToBots; // Convar that decides if attributes should a
 ConVar g_bApplyClassChangesToMvMBots; // Convar that decides if attributes should apply to MvM bots.
 
 Handle g_hSDKFinishBuilding;
+Handle g_Maplist = INVALID_HANDLE;
 
 bool g_bIsMVM = false; // Is the mode MvM?
 bool IS_MEDIEVAL = false;
+bool IS_HALLOWEEN = false;
 bool IS_SAXTON = false;
 
 float g_lastHit[MAXPLAYERS+1];
@@ -32,6 +34,7 @@ int g_condFlags[MAXPLAYERS+1];
 int g_lastHeal[MAXPLAYERS+1];
 int g_lockOn[MAXPLAYERS+1];
 int g_Fov[MAXPLAYERS+1];
+int g_spawnPumpkin[MAXPLAYERS+1];
 // int g_healing[MAXPLAYERS+1];
 int g_bisonHit[2048];
 int g_Grenades[2048];
@@ -49,6 +52,7 @@ float g_flagTime[2048];
 // int CART = -1;
 // float CARTSPEED = 200.0;
 int g_FilteredEntity = -1;
+int g_Maplist_Serial = -1;
 float IRON_DETECT = 80.0;
 float HOVER_TIME = -2.0;
 float PARACHUTE_TIME = 6.0;
@@ -126,6 +130,8 @@ public void OnPluginStart()
 	HookEvent("post_inventory_application", Event_PlayerSpawn);
 	HookEvent("player_death", Event_PlayerDeath);
 	HookEvent("player_builtobject", Event_BuildObject);
+	HookEvent("teamplay_flag_event", Event_FlagEvent);
+	HookEvent("teamplay_capture_blocked", Event_BlockCapture);
 	// HookEvent("player_healed", Event_PlayerHealed);
 	// HookEvent("object_destroyed", Event_ObjectDestroyed);
 
@@ -152,6 +158,13 @@ public void OnPluginStart()
 	}
 	else
 		IS_MEDIEVAL = false;
+
+	g_Maplist = CreateArray(ByteCountToCells(33));
+
+	// Bind the map list file to the "halloween" map list
+	char mapListPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, mapListPath, sizeof(mapListPath), "configs/halloween_maps.txt");
+	SetMapListCompatBind("halloween", mapListPath);
 
 	if(StrContains(mapName,"vsh_") != -1)
 		IS_SAXTON = true;
@@ -206,6 +219,8 @@ public void OnMapStart()
 	PrecacheSound("mvm/giant_soldier/giant_soldier_explode.wav",true);
 	PrecacheSound("misc/halloween/spell_skeleton_horde_cast.wav",true);
 	PrecacheSound("misc/banana_slip.wav",true);
+	PrecacheSound("misc/sniper_railgun_double_kill.wav",true);
+	PrecacheSound("weapons/tf2_backshot_shotty.wav",true);
 	PrecacheModel("models/weapons/w_models/w_syringe_proj.mdl",true);
 	PrecacheModel("models/weapons/c_models/c_leechgun/c_leech_proj.mdl",true);
 	PrecacheModel("models/workshop/weapons/c_models/c_chocolate/plate_chocolate.mdl",true);
@@ -227,6 +242,20 @@ public void OnMapStart()
 		IS_SAXTON = true;
 	else
 		IS_SAXTON = false;
+
+	if (ReadMapList(g_Maplist,g_Maplist_Serial,"halloween",MAPLIST_FLAG_CLEARARRAY|MAPLIST_FLAG_NO_DEFAULT)	!= INVALID_HANDLE)
+	{
+		LogMessage("Loaded/Updated Halloween map list");
+	}
+	else if (g_Maplist_Serial == -1)
+	{
+		SetFailState("Halloween map list can't be loaded,");
+	}
+
+	if(IsHalloweenMap(mapName))
+		IS_HALLOWEEN = true;
+	else
+		IS_HALLOWEEN = false;
 }
 
 public void OnEntityCreated(int iEnt, const char[] classname)
@@ -378,7 +407,6 @@ public Action Event_PlayerSpawn(Handle hEvent, const char[] cName, bool dontBroa
 		}
 	}
 	
-
 	int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
 	int meleeIndex = -1;
 	if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
@@ -575,9 +603,9 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				TF2Attrib_SetByDefIndex(primary,338,0.0); //victim loses cloak
 				TF2Attrib_SetByDefIndex(primary,6,0.625/0.8); //firing speed bonus
 				TF2Attrib_SetByDefIndex(primary,97,0.87/1.02); //reload speed bonus
-				// TF2Attrib_SetByDefIndex(primary,335,1.5); //clip size upgrade
-				// SetEntPropFloat(primary, Prop_Send, "m_flEnergy", 30.0);
-				TF2Attrib_SetByDefIndex(primary,103,1.5); //projectile speed
+				TF2Attrib_SetByDefIndex(primary,335,1.5); //clip size upgrade
+				SetEntPropFloat(primary, Prop_Send, "m_flEnergy", 30.0);
+				TF2Attrib_SetByDefIndex(primary,103,1.33); //projectile speed
 			}
 			//The Back Scatter
 			case 1103:
@@ -624,14 +652,15 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Natascha
 			case 41:
 			{
-				// TF2Attrib_SetByDefIndex(primary,1,0.80); //damage penalty
-				// TF2Attrib_SetByDefIndex(primary,16,5.0); //heal on hit for rapidfire
+				TF2Attrib_SetByDefIndex(primary,1,0.67); //damage penalty
+				TF2Attrib_SetByDefIndex(primary,6,0.85); //firing speed bonus
 				TF2Attrib_SetByDefIndex(primary,32,0.0); //slow on hit
 				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
 				TF2Attrib_SetByDefIndex(primary,69,0.33); //health from healers reduced
 				TF2Attrib_SetByDefIndex(primary,76,1.5); //maxammo primary increased
 				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 				SetEntProp(iClient, Prop_Data, "m_iAmmo", 300 , _, primaryAmmo);
+				// TF2Attrib_SetByDefIndex(primary,16,8.0); //heal on hit for rapidfire
 			}
 			//Bazaar Bargain
 			case 402:
@@ -733,7 +762,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//The Righteous Bison
 			case 442:
 			{
-				TF2Attrib_SetByDefIndex(secondary,2,3.0); //damage bonus
+				TF2Attrib_SetByDefIndex(secondary,2,2.5); //damage bonus
 				TF2Attrib_SetByDefIndex(secondary,6,0.8); //firing speed bonus
 				TF2Attrib_SetByDefIndex(secondary,103,1.5); //projectile speed
 			}
@@ -781,6 +810,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				TF2Attrib_SetByDefIndex(secondary,74,1.0); //burn time
 				if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
 					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
+				TF2Attrib_SetByDefIndex(secondary,875,1.0); //explode_on_ignite
 			}
 			//The Razorback
 			case 57:
@@ -1196,6 +1226,12 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						TF2Attrib_SetByDefIndex(melee,851,0.9); //mult_player_movespeed_active
 						TF2Attrib_SetByDefIndex(melee,535,1.0); //damage force increase hidden
 					}
+					//Pain Train
+					case 154:
+					{
+						TF2Attrib_SetByDefIndex(melee,125,-15.0); //max health additive penalty
+						TF2Attrib_SetByDefIndex(melee,67,1.0); //dmg taken from bullets increased
+					}
 				}
 			}
 		}
@@ -1310,6 +1346,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_lastHeal[iClient] = 0;
 		g_lockOn[iClient] = 0;
 		g_holstering[iClient] = false;
+		g_spawnPumpkin[iClient] = 0;
 		// g_Grenades[iClient][0]=0;g_Grenades[iClient][2]=0;g_Grenades[iClient][2]=0;g_Grenades[iClient][3]=0;g_Grenades[iClient][4]=0;
 		// g_Grenades[iClient][5]=0;g_Grenades[iClient][6]=0;g_Grenades[iClient][7]=0;g_Grenades[iClient][8]=0;g_Grenades[iClient][9]=0;
 		
@@ -1343,6 +1380,9 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 		int meleeIndex = -1;
 		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 		
+		
+
+
 
 		//credit "finished off" and shield kills with on-kill bonuses
 		if(attacker != inflict)
@@ -1508,7 +1548,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 			case 811,832: //Heater explode on kill
 			{
 				float toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,430));
-				if (toggle==12.0)
+				if (toggle==12.0 && attacker!=victim)
 				{
 					g_condFlags[victim] |= TF_CONDFLAG_HEATER;
 					float targetPos[3], victimPos[3];
@@ -1652,6 +1692,45 @@ public Action Event_BuildObject(Event event, const char[] cName, bool dontBroadc
 					TF2_AddCondition(user,TFCond_SpeedBuffAlly,3.1);
 				}
 			}
+		}
+	}
+	return Plugin_Continue;
+}
+
+public Action Event_FlagEvent(Event event, const char[] cName, bool dontBroadcast)
+{
+	int player = GetEventInt(event, "player");
+	int type = GetEventInt(event, "eventtype");
+	
+	if(IsValidClient(player) && type==TF_FLAGEVENT_PICKEDUP)
+	{
+		int melee = TF2Util_GetPlayerLoadoutEntity(player, TFWeaponSlot_Melee, true);
+		int meleeIndex = -1;
+		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+
+		//Pain Train speed boost on pickup
+		if(meleeIndex==154)
+		{
+			TF2_AddCondition(player,TFCond_SpeedBuffAlly,3.1);
+		}
+	}
+	return Plugin_Continue;
+}
+
+public Action Event_BlockCapture(Event event, const char[] cName, bool dontBroadcast)
+{
+	int blocker = GetEventInt(event, "blocker");
+
+	if(IsValidClient(blocker))
+	{
+		int melee = TF2Util_GetPlayerLoadoutEntity(blocker, TFWeaponSlot_Melee, true);
+		int meleeIndex = -1;
+		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+
+		//Pain Train speed boost on block
+		if(meleeIndex==154)
+		{
+			TF2_AddCondition(blocker,TFCond_SpeedBuffAlly,3.1);
 		}
 	}
 	return Plugin_Continue;
@@ -1994,6 +2073,8 @@ public void OnGameFrame()
 							g_meterPri[iClient] = 0.0;
 						}
 						
+						// SetHudTextParams(-1.0, -0.4, 0.1, 255, 255, 255, 255);
+						// ShowHudText(iClient,2,"%.1f%% SPUN",g_meterPri[iClient]*100);
 					}
 					switch(primaryIndex)
 					{
@@ -2014,6 +2095,10 @@ public void OnGameFrame()
 									TF2Attrib_SetByDefIndex(primary,2,1.0*factor); //damage bonus
 								}
 							}
+						}
+						default:
+						{
+							
 						}
 					}
 					switch(secondaryIndex)
@@ -2158,6 +2243,7 @@ public void OnGameFrame()
 							int healing = GetEntProp(iClient, Prop_Send, "m_iHealPoints");
 							float meter = (healing-g_meterMel[iClient])/3.0;
 							if(meter < 0) meter = 0.0;
+							int organs = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
 
 							// if(g_condFlags[iClient] & TF_CONDFLAG_HEALSTEAL) //makes sure ORGAN resets post-spawn
 							// {
@@ -2167,17 +2253,25 @@ public void OnGameFrame()
 							// }
 							
 							SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-							if(meter >= 100)
+							if(organs < 4)
 							{
-								ShowHudText(iClient,4,"Organ: DONE %.0f",meter);
-								g_meterMel[iClient] = healing+0.0;
-								int organs = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
-								SetEntProp(iClient, Prop_Send, "m_iDecapitations",organs+1);
-								EmitSoundToClient(iClient,"player/recharged.wav");
+								if(meter >= 100)
+								{
+									ShowHudText(iClient,4,"Organ: DONE %.0f",meter);
+									g_meterMel[iClient] = healing+0.0;
+									SetEntProp(iClient, Prop_Send, "m_iDecapitations",organs+1);
+									EmitSoundToClient(iClient,"player/recharged.wav");
+								}
+								else
+								{
+									ShowHudText(iClient,4,"Organ: %.0f %",meter);
+								}
 							}
 							else
 							{
+								if(organs>4) SetEntProp(iClient, Prop_Send, "m_iDecapitations",4);
 								ShowHudText(iClient,4,"Organ: %.0f %",meter);
+								g_meterMel[iClient] = healing+0.0;
 							}
 						}
 					}
@@ -2449,10 +2543,9 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 			pack.WriteFloat(time);
 			RequestFrame(FireDebuff,pack);
 		}
-		case TFCond_HalloweenCritCandy: //disable crit pumpkins
-		{
-			return Plugin_Handled;
-		}
+		// case TFCond_HalloweenCritCandy: //disable crit pumpkins
+		// {
+		// }
 		case TFCond_FocusBuff: //reset Heatmaker tracer
 		{
 			int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
@@ -3194,10 +3287,20 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 			{
 				if(g_condFlags[iClient] & TF_CONDFLAG_INFIRE)
 				{
-					buttons |= IN_ATTACK;
-					weapon = 0;
 					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 					int clip = GetEntData(wep, iAmmoTable, 4);
+					if (secondaryIndex == 1153 && g_meterSec[iClient]>clip)
+					{
+						g_meterSec[iClient] = clip+0.0;
+						if(buttons & IN_ATTACK != IN_ATTACK) EmitSoundToClient(iClient,"weapons/tf2_backshot_shotty.wav");
+					}
+					else if (g_meterPri[iClient]>clip)
+					{
+						g_meterPri[iClient] = clip+0.0;
+						if(buttons & IN_ATTACK != IN_ATTACK) EmitSoundToClient(iClient,"weapons/tf2_backshot_shotty.wav");
+					}
+					weapon = 0;
+					buttons |= IN_ATTACK;
 					if(clip==0 || !IsPlayerAlive(iClient))
 					{
 						TF2Attrib_SetByDefIndex(wep,6,1.0);
@@ -3206,9 +3309,16 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				}
 				else
 				{
-					if(buttons & IN_ATTACK2)
+					if(buttons & IN_ATTACK2 && !(g_LastButtons[iClient] & IN_ATTACK2))
 					{
 						g_condFlags[iClient] |= TF_CONDFLAG_INFIRE;
+						EmitSoundToClient(iClient,"weapons/tf2_backshot_shotty.wav");
+						int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+						int clip = GetEntData(wep, iAmmoTable, 4);
+						if (secondaryIndex == 1153)
+							g_meterSec[iClient] = clip+0.0;
+						else
+							g_meterPri[iClient] = clip+0.0;
 						TF2Attrib_SetByDefIndex(wep,6,0.67);
 					}
 				}
@@ -3650,6 +3760,27 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					RequestFrame(CannonKnockback,victim);
 				}
 			}
+			case 526, 30665:
+			{
+				if(GetClientHealth(victim)<=0 && damagetype & DMG_SHOCK)
+				{
+					EmitAmbientSound("misc/sniper_railgun_double_kill.wav",damagePosition,victim,SNDLEVEL_TRAIN);
+				}
+			}
+		}
+	}
+	if(GetClientHealth(victim)<=0 && victim != attacker && IS_HALLOWEEN)
+	{
+		int resource = GetPlayerResourceEntity();
+		if (resource != -1)
+		{
+			int atkScore = GetEntProp(resource, Prop_Send, "m_iScore", _, attacker);
+			int vicScore = GetEntProp(resource, Prop_Send, "m_iScore", _, victim);
+
+			if(atkScore<vicScore)
+			{
+				g_spawnPumpkin[victim] = attacker;
+			}
 		}
 	}
 }
@@ -3793,6 +3924,12 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				damage = 0.01;
 			}
 		}
+
+		if(weaponIndex==1180)
+		{
+			//gas passer ignite damage
+			damage = 15.0;
+		}
 		
 		switch(tfAttackerClass)
 		{
@@ -3856,7 +3993,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			case TFClass_DemoMan:
 			{
 				if(weaponIndex == 307 && damagetype & DMG_BLAST == DMG_BLAST) //caber damage bonus just on explosion
-					damage *= 1.11;
+					damage *= 1.15;
 				if(weaponIndex == 1151 && (damage == 85.0 || damage == 255.0 || damage == 114.75)) //restore direct damage from iron bomber
 					damage /= 0.85;
 			}
@@ -3944,6 +4081,17 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						{
 							damagecustom = TF_CUSTOM_HEADSHOT;
 							damagetype &= ~DMG_SHOCK;
+						}
+					}
+					case 526, 30665:
+					{
+						if(damagetype & DMG_SHOCK)
+						{
+							// damagetype &= ~DMG_SHOCK;
+							if(damagetype & DMG_CRIT && !isKritzed(attacker))
+							{
+								damagecustom = TF_CUSTOM_HEADSHOT;
+							}
 						}
 					}
 				}
@@ -4385,9 +4533,62 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 					damage *= 0.5;
 			}
 			case 1151:
-			{
-				if (damage == 85.0) //restore direct damage from iron bomber
+			{ //restore direct damage from iron bomber
+				if (damage == 85.0) 
 					damage /= 0.85;
+			}
+			case 526, 30665:
+			{ //Machina penetrate building
+				int idx, closest = -1;
+				int victim, hit;
+				float distance, closestDistance;
+				float client_pos[3],target_pos[3], angles1[3];
+				GetClientEyePosition(attacker,client_pos);
+				for(idx = 1; idx < 2048; idx++)
+				{
+					if(IsValidEdict(idx) && idx != building && idx != attacker)
+					{
+						GetEntityClassname(idx, class, sizeof(class));
+						if(idx <= MaxClients || StrEqual(class, "obj_sentrygun") || StrEqual(class, "obj_dispenser") || StrEqual(class, "obj_teleporter"))
+						{
+							GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
+							target_pos[2]+=40;
+							distance = GetVectorDistance(damagePosition, target_pos);
+							if(distance < 512.0 && GetEntProp(idx, Prop_Send, "m_iTeamNum") != GetEntProp(attacker, Prop_Send, "m_iTeamNum"))
+							{
+								GetClientEyeAngles(attacker, angles1);								
+								Handle hndl = TR_TraceRayFilterEx(client_pos, angles1, MASK_SOLID_BRUSHONLY|CONTENTS_HITBOX, RayType_Infinite, SimpleTraceFilter, idx);
+								if (TR_DidHit(hndl))
+								{
+									victim = TR_GetEntityIndex(hndl);
+									if(victim == idx)
+									{
+										if(closestDistance > distance || closestDistance == 0.0)
+										{
+											hit = TR_GetHitGroup(hndl);
+											closest = idx; closestDistance = distance;
+										}
+									}
+								}
+								delete hndl;
+							}
+						}
+					}
+				}
+				if(closest != -1)
+				{
+					if(IsValidClient(closest))
+					{
+						if(hit == 1) damagetype |= DMG_CRIT;
+						SDKHooks_TakeDamage(closest, inflictor, attacker, damage, damagetype|DMG_SHOCK, weapon, damageForce, target_pos, false);
+					}
+					else
+					{
+						SetVariantInt(RoundFloat(damage));
+						AcceptEntityInput(closest,"RemoveHealth");
+						EmitAmbientSound("misc/sniper_railgun_double_kill.wav",target_pos,closest,SNDLEVEL_TRAIN);
+					}
+				}
 			}
 		}
 		if(StrEqual("obj_sentrygun",class))
@@ -4445,42 +4646,51 @@ public void Event_SpawnAmmo(int entity)
 	GetEntityClassname(entity, class, sizeof(class));
 	char name[64];
 	GetEntPropString(entity, Prop_Data, "m_iName",name,64);
-	// PrintToChatAll("SPAWN %s %s",class,name);
 	if(StrContains(class,"ammo_pack") != -1)
 	{
-		// int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-		// // float speed = GetEntPropFloat(entity, Prop_Data, "m_flFadeScale");
-		// int hp = GetEntProp(entity, Prop_Data, "m_iHealth");
-		// PrintToChatAll("AMMO %d",hp);
-		// if(g_spawnPumpkin[owner] == 1){
-		// 	SetEntityModel(entity,"models/props_halloween/pumpkin_loot.mdl");
-		// 	float vel[3]; vel[2]=100.0;
-		// 	TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,vel);
-		// }
-		// else if(StrContains(name,"custom") != -1){
-		// 	int Ammopack = CreateEntityByName("tf_ammo_pack");
-		// 	DispatchKeyValue(Ammopack, "OnPlayerTouch", "!self,Kill,,0,-1");
-		// 	DispatchKeyValue(Ammopack, "targetname", "customAmmo");
-		// 	DispatchSpawn(Ammopack);
-		// 	float AmmoPos[3];
-		// 	GetClientEyePosition(owner,AmmoPos);
-		// 	TeleportEntity(Ammopack, AmmoPos, NULL_VECTOR, NULL_VECTOR);
-		// 	AcceptEntityInput(entity,"Kill");
-		// }
+		int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+		if(IsValidClient(owner) && IS_HALLOWEEN)
+		{
+			if(g_spawnPumpkin[owner] != 0)
+			{
+				int team = GetClientTeam(g_spawnPumpkin[owner]);
+				SetEntProp(entity, Prop_Send, "m_iTeamNum", team);
+				SetEntityModel(entity,"models/props_halloween/pumpkin_loot.mdl");
+				float vel[3]; vel[2]=100.0;
+				TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,vel);
+				SDKHook(entity, SDKHook_Touch, ammoOnTouch);
+			}
+			else
+			{
+				int Ammopack = CreateEntityByName("item_ammopack_medium");
+				if(IsValidEdict(Ammopack))
+				{
+					DispatchKeyValue(Ammopack, "OnPlayerTouch", "!self,Kill,,0,-1");
+					DispatchKeyValue(Ammopack, "targetname", "customAmmo");
+					float AmmoPos[3];
+					GetEntPropVector(owner, Prop_Send, "m_vecOrigin", AmmoPos);
+					AmmoPos[2]+=5;
+					TeleportEntity(Ammopack, AmmoPos, NULL_VECTOR, NULL_VECTOR);
+
+					DispatchSpawn(Ammopack);
+					AcceptEntityInput(entity,"Kill");
+					CreateTimer(30.0, PackDelete, Ammopack);
+				}
+			}
+		}
 		if(IS_MEDIEVAL)
 		{
 			int healthpack = CreateEntityByName("item_healthkit_small");
 			if(IsValidEdict(healthpack))
 			{
-				int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+				// int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 				g_FilteredEntity = owner;
-				float position[3];
-				GetEntPropVector(entity, Prop_Send, "m_vecOrigin", position);
 				DispatchKeyValue(healthpack, "StartDisabled", "false");
 				DispatchKeyValue(healthpack, "AutoMaterialize", "false");
 				AcceptEntityInput(healthpack,"Enable");
 				SetEntData(healthpack,336,1,_,true); //m_spawnflags
 				SetEntData(healthpack,344,1,_,true); //m_fFlags
+				float position[3];
 				GetEntPropVector(owner, Prop_Send, "m_vecOrigin", position);
 
 				TeleportEntity(healthpack, position, NULL_VECTOR, NULL_VECTOR);
@@ -4500,13 +4710,30 @@ public bool MedipackTraceFilter(int ent, int contentMask, any data)
 
 public Action PackDelete(Handle timer, int pack)
 {
-	char class[64];
-	GetEntityClassname(pack, class, sizeof(class));
-	if(StrEqual(class,"item_healthkit_small"))
+	if(IsValidEdict(pack))
 	{
-		AcceptEntityInput(pack,"Kill");
+		char class[64];
+		GetEntityClassname(pack, class, sizeof(class));
+		if(StrEqual(class,"item_healthkit_small")||StrContains(class,"_ammo")!=-1)
+		{
+			AcceptEntityInput(pack,"Kill");
+		}
 	}
 	return Plugin_Continue;
+}
+
+Action ammoOnTouch(int entity, int other)
+{
+	if(IsValidEdict(entity) && IsValidClient(other))
+	{
+		if(GetClientTeam(other) == GetEntProp(entity, Prop_Send, "m_iTeamNum"))
+		{
+			TF2_AddCondition(other,TFCond_HalloweenCritCandy,3.2);
+			CreateTimer(0.15, PackDelete, entity);
+			SDKUnhook(entity,SDKHook_Touch,ammoOnTouch);
+		}
+	}
+	return Plugin_Handled;
 }
 
 public Action Event_PickUpAmmo(int entity, int other)
@@ -4522,9 +4749,6 @@ public Action Event_PickUpAmmo(int entity, int other)
 		else if(StrContains(class,"small") != -1) factor=5;
 		else if(StrContains(class,"medium") != -1) factor=2;
 		else if(StrContains(class,"large") != -1 || StrContains(class,"full") != -1) factor=1;
-		// if(StrContains(model,"pumpkin_loot") != -1){
-		// 	TF2_AddCondition(other,TFCond_HalloweenCritCandy,3.2,other);
-		// }
 
 		int melee = TF2Util_GetPlayerLoadoutEntity(other, TFWeaponSlot_Melee, true);
 		int meleeIndex = -1;
@@ -5524,16 +5748,16 @@ public Action gasExplode(Handle timer, DataPack pack)
 	int victim = pack.ReadCell();
 	int gasser = pack.ReadCell();
 	float meter = pack.ReadFloat();
-	float damagePosition[3];
+	// float damagePosition[3];
 
 	if(IsPlayerAlive(victim))
 	{
-		GetEntPropVector(victim, Prop_Send, "m_vecOrigin", damagePosition);
-		int secondary = TF2Util_GetPlayerLoadoutEntity(gasser, TFWeaponSlot_Secondary, true);
-		SDKHooks_TakeDamage(victim, gasser, gasser, 20.0, DMG_SLASH, secondary, NULL_VECTOR, damagePosition);
+		// GetEntPropVector(victim, Prop_Send, "m_vecOrigin", damagePosition);
+		// int secondary = TF2Util_GetPlayerLoadoutEntity(gasser, TFWeaponSlot_Secondary, true);
+		// SDKHooks_TakeDamage(victim, gasser, gasser, 20.0, DMG_SLASH, secondary, NULL_VECTOR, damagePosition);
 	}
+	// CreateParticle(victim,"dragons_fury_effect",2.0);
 	SetEntPropFloat(gasser, Prop_Send, "m_flItemChargeMeter", meter, 1);
-	CreateParticle(victim,"dragons_fury_effect",2.0);
 	return Plugin_Continue;
 }
 
@@ -6247,6 +6471,13 @@ bool TraceFilter(int entity, int contentsmask, any data)
 	return true;
 }
 
+bool SimpleTraceFilter(int entity, int contentsMask, any data)
+{
+    if(entity != data)
+        return (false);
+    return (true);
+}
+
 float getPlayerDistance(int clientA, int clientB)
 {
 	float clientAPos[3], clientBPos[3];
@@ -6314,4 +6545,10 @@ public bool CanClientReceiveClassAttributes(int iClient)
 	}
 	
 	return true;
+}
+
+stock bool IsHalloweenMap(const char[] mapname)
+{
+	int mapIndex = FindStringInArray(g_Maplist, mapname);
+	return (mapIndex > -1);
 }
