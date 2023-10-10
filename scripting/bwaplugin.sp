@@ -39,7 +39,7 @@ int g_spawnPumpkin[MAXPLAYERS+1];
 int g_bisonHit[2048];
 int g_Grenades[2048];
 int g_buildingHeal[2048];
-bool g_holstering[MAXPLAYERS+1];
+float g_holstering[MAXPLAYERS+1];
 float g_holsterPri[MAXPLAYERS+1];
 float g_holsterSec[MAXPLAYERS+1];
 float g_holsterMel[MAXPLAYERS+1];
@@ -54,7 +54,7 @@ float g_flagTime[2048];
 int g_FilteredEntity = -1;
 int g_Maplist_Serial = -1;
 float IRON_DETECT = 80.0;
-float HOVER_TIME = -2.0;
+float HOVER_TIME = 1.00;
 float PARACHUTE_TIME = 6.0;
 float FIRE_TIME = 3.0;
 // float SODA_DAMAGE = 10.0;
@@ -1345,7 +1345,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_condFlags[iClient] = 0;
 		g_lastHeal[iClient] = 0;
 		g_lockOn[iClient] = 0;
-		g_holstering[iClient] = false;
+		g_holstering[iClient] = 0.0;
 		g_spawnPumpkin[iClient] = 0;
 		// g_Grenades[iClient][0]=0;g_Grenades[iClient][2]=0;g_Grenades[iClient][2]=0;g_Grenades[iClient][3]=0;g_Grenades[iClient][4]=0;
 		// g_Grenades[iClient][5]=0;g_Grenades[iClient][6]=0;g_Grenades[iClient][7]=0;g_Grenades[iClient][8]=0;g_Grenades[iClient][9]=0;
@@ -1379,10 +1379,6 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 		int melee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
 		int meleeIndex = -1;
 		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
-		
-		
-
-
 
 		//credit "finished off" and shield kills with on-kill bonuses
 		if(attacker != inflict)
@@ -1486,6 +1482,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
 						}
 					}
+					case 939: //spooky skeleton
+					{
+						if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
+					}
 				}
 
 				if(addCharge>0)
@@ -1565,7 +1565,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 								float dist = GetVectorDistance(victimPos,targetPos);
 								if(victim != i && dist<=170 && TF2_GetClientTeam(i) != TF2_GetClientTeam(attacker))
 								{
-									SDKHooks_TakeDamage(i, attacker, attacker, 15.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos);
+									SDKHooks_TakeDamage(i, attacker, attacker, 15.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos, false);
 									if(TF2_GetPlayerClass(i) != TFClass_Pyro) TF2Util_SetPlayerBurnDuration(i,4.0);
 								}
 							}
@@ -1635,6 +1635,17 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
 				}
 			}
+			case 939: //spooky skeleton
+			{
+				if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
+			}
+		}
+
+		int victimMelee = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Melee, true);
+		int victimMeleeIndex = -1;
+		if(victimMelee >= 0) victimMeleeIndex = GetEntProp(victimMelee, Prop_Send, "m_iItemDefinitionIndex");
+		if(victimMeleeIndex==939 && attacker!=victim){
+			if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
 		}
 
 		//marked speed buff for Fan of War
@@ -1802,15 +1813,15 @@ public void OnGameFrame()
 			//count airtime until pyro can jetpack boost
 			if(g_condFlags[iClient] & TF_CONDFLAG_HOVER)
 			{
-				g_meterSec[iClient] -= 1.0/66;
-				if((clientFlags & FL_ONGROUND) || g_meterSec[iClient] < HOVER_TIME)
+				g_meterSec[iClient] += 0.015;
+				if((clientFlags & FL_ONGROUND) || g_meterSec[iClient] > HOVER_TIME)
 				{
 					SetEntityGravity(iClient,1.0);
 					g_meterSec[iClient] = 0.0;
 					g_condFlags[iClient] &= ~TF_CONDFLAG_HOVER;
+					// TF2_RemoveCondition(iClient,TFCond_Dazed);
+					// TF2_RemoveCondition(iClient,TFCond_RocketPack);
 				}
-				else if(secondaryIndex == 1179 && g_meterSec[iClient] > -1)
-					g_meterSec[iClient] += 0.1;
 			}
 			//count airtime for BASE Jumper
 			if(secondaryIndex == 1101 || primaryIndex == 1101)
@@ -1900,6 +1911,13 @@ public void OnGameFrame()
 				}
 				case TFClass_Pyro:
 				{
+					if(TF2_IsPlayerInCondition(iClient,TFCond_BlastJumping))
+					{
+						float vel[3];
+						GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
+						if((clientFlags & FL_ONGROUND) || vel[2] ==0.0)
+							TF2_RemoveCondition(iClient,TFCond_BlastJumping);
+					}
 					if(primaryIndex != 594 && primaryIndex !=1 && primary!=-1) //handle airblast, except for dragon's fury and phlog
 					{
 						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
@@ -1911,7 +1929,7 @@ public void OnGameFrame()
 							{
 								float vel[3];
 								GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
-								if(vel[2]!=0)
+								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND)))
 								{
 									if(!(primaryIndex == 1178 && meter!=0.0))
 										AirblastPush(iClient);
@@ -2868,50 +2886,60 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				//thruster
 				if(1179 == secondaryIndex)
 				{
-					bool rocketing = GetEntPropFloat(secondary, Prop_Send, "m_flLaunchTime") != 0.0 || TF2_IsPlayerInCondition(iClient,TFCond_RocketPack) || TF2_IsPlayerInCondition(iClient,TFCond_Parachute) || TF2_IsPlayerInCondition(iClient,TFCond_ParachuteDeployed);
-					if(!(clientFlags & FL_ONGROUND) && !rocketing &&
-					GetEntPropFloat(secondary, Prop_Send, "m_flLaunchTime") == 0.0 && GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1) > 50)
+					if(g_condFlags[iClient] & TF_CONDFLAG_HOVER)
 					{
-						if ((buttons & IN_JUMP))
+						if(buttons & IN_JUMP)
 						{
-							if (!(g_LastButtons[iClient] & IN_JUMP) && g_meterSec[iClient] == -1.0)
-							{
-								//activate jetpack boost, consume 50% charge
-								g_meterSec[iClient] = -1.33;
-								TF2_AddCondition(iClient,TFCond_Dazed,1.0);
-								TF2_AddCondition(iClient,TFCond_RocketPack);
-								g_condFlags[iClient] |= TF_CONDFLAG_HOVER;
-								SetEntityGravity(iClient,0.2);
-
-								float regen = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1);
-								SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",regen-50.0,1);
-								float angle = angles[1]*0.01745329;
-								if(vel[0] != 0 && vel[1] != 0)
-								{
-									vel[0] *= 0.71; vel[1] *= 0.71;
-								}
-								currVel[0] = ((vel[0] * Cosine(angle)) - (-vel[1] * Sine(angle)))*0.75;
-								currVel[1] = ((-vel[1] * Cosine(angle)) + (vel[0] * Sine(angle)))*0.75;
-								currVel[2] = 225.0;
-								TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, currVel);
-								//boost fx
-								float exAngle = 0.0;
-								vel[0] *= 1.25; vel[1] *= 1.25; 
-								if(vel[0]!=0)
-								{
-									if(vel[1]!=0) exAngle = vel[1] > 0 ? 45.0 : 135.0;
-									else exAngle = 90.0;
-									if(vel[0]<0) exAngle *= -1;
-								}
-								else exAngle = vel[1] < 0 ? 180.0 : 0.0;
-								if(!(vel[0]!=0 || vel[1]!=0)) exAngle += angles[1];
-								else exAngle += angles[1] - 90;
-								CreateParticle(iClient,"rocketpack_exhaust",0.33,-90.0,exAngle,_,_,42.0);
-								EmitAmbientSound("weapons/rocket_pack_boosters_charge.wav",position,iClient);
-							}
+							currVel[2] += 50;
+							if(currVel[2] > 250) currVel[2] = 250.0;
+							TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, currVel);
 						}
-						else if (((g_LastButtons[iClient] & IN_JUMP) || g_meterSec[iClient]>1.0) && g_meterSec[iClient] != -2.0)
-							g_meterSec[iClient] = -1.0; //allow player to access boost
+					}
+					else
+					{
+						if(currVel[2]!=0.0 || !(clientFlags & FL_ONGROUND))
+							g_meterSec[iClient]+=0.015;
+						else if(g_meterSec[iClient]!=0.0)
+							g_meterSec[iClient] = 0.0;
+					}
+					bool rocketing = GetEntPropFloat(secondary, Prop_Send, "m_flLaunchTime") != 0.0 || TF2_IsPlayerInCondition(iClient,TFCond_RocketPack) || TF2_IsPlayerInCondition(iClient,TFCond_Parachute) || TF2_IsPlayerInCondition(iClient,TFCond_ParachuteDeployed);
+					if((currVel[2]!=0.0 || !(clientFlags & FL_ONGROUND)) && !rocketing && GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1) > 50)
+					{
+						if ((buttons & IN_JUMP) && !(g_LastButtons[iClient] & IN_JUMP) && g_meterSec[iClient] >= 0.15)
+						{
+							//activate jetpack boost, consume 50% charge
+							g_meterSec[iClient] = 0.0;
+							TF2_AddCondition(iClient,TFCond_Dazed,1.0);
+							TF2_AddCondition(iClient,TFCond_RocketPack);
+							g_condFlags[iClient] |= TF_CONDFLAG_HOVER;
+							SetEntityGravity(iClient,0.25);
+
+							float regen = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1);
+							SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",regen-50.0,1);
+							float angle = angles[1]*0.01745329;
+							if(vel[0] != 0 && vel[1] != 0)
+							{
+								vel[0] *= 0.71; vel[1] *= 0.71;
+							}
+							currVel[0] = ((vel[0] * Cosine(angle)) - (-vel[1] * Sine(angle)))*0.875;
+							currVel[1] = ((-vel[1] * Cosine(angle)) + (vel[0] * Sine(angle)))*0.875;
+							currVel[2] = 75.0;
+							TeleportEntity(iClient, NULL_VECTOR, NULL_VECTOR, currVel);
+							//boost fx
+							float exAngle = 0.0;
+							vel[0] *= 1.25; vel[1] *= 1.25; 
+							if(vel[0]!=0)
+							{
+								if(vel[1]!=0) exAngle = vel[1] > 0 ? 45.0 : 135.0;
+								else exAngle = 90.0;
+								if(vel[0]<0) exAngle *= -1;
+							}
+							else exAngle = vel[1] < 0 ? 180.0 : 0.0;
+							if(!(vel[0]!=0 || vel[1]!=0)) exAngle += angles[1];
+							else exAngle += angles[1] - 90;
+							CreateParticle(iClient,"rocketpack_exhaust",0.33,-90.0,exAngle,_,_,42.0);
+							EmitAmbientSound("weapons/rocket_pack_boosters_charge.wav",position,iClient);
+						}
 					}
 				}
 			}
@@ -3336,21 +3364,25 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 		}
 
 		//weapon holstering speeds
-		if(weapon!=0 && !g_holstering[iClient])
+		if(weapon!=0 && g_holstering[iClient]==0.0)
 		{
-			g_holstering[iClient] = true;
+			g_holstering[iClient] = 1.0;
 			float speed = 1.0;
 			if(primary==curr) speed = g_holsterPri[iClient];
 			else if(secondary==curr) speed = g_holsterSec[iClient];
 			else if(melee==curr) speed = g_holsterMel[iClient];
 			TF2Attrib_SetByDefIndex(iClient,177,speed);
 		}
-		else if(g_holstering[iClient])
+		else if(g_holstering[iClient]>0.0)
 		{
-			if(GetGameTime() >= GetEntPropFloat(curr, Prop_Send, "m_flNextPrimaryAttack"))
+			if(weapon!=0)
+				g_holstering[iClient] = 1.0;
+			if(g_holstering[iClient]==1.0)
+				g_holstering[iClient] = GetEntPropFloat(curr, Prop_Send, "m_flNextPrimaryAttack");
+			if(GetGameTime() >= g_holstering[iClient])
 			{
 				TF2Attrib_SetByDefIndex(iClient,177,1.0);
-				g_holstering[iClient] = false;
+				g_holstering[iClient] = 0.0;
 			}
 		}
 		if(weapon==melee && g_consecHits[iClient]!=-1) //reset melee combo when pulled out
@@ -3439,11 +3471,12 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 		{
 			case TFClass_Spy:
 			{
-				if(damagetype & DMG_BULLET){ //extend ambassador range
+				if(damagetype & DMG_BULLET)
+				{
 					int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
 					int secondaryIndex = -1;
 					if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-					if(secondaryIndex==61 || secondaryIndex==1006)
+					if(secondaryIndex==61 || secondaryIndex==1006) //extend ambassador range
 					{
 						float time = GetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime");
 						float dist = getPlayerDistance(attacker,victim);
@@ -3488,6 +3521,23 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 					}
 				}
 			}
+			// case TFClass_Pyro:
+			// {
+			// 	if(damagetype & DMG_BUCKSHOT)
+			// 	{
+			// 		int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+			// 		int secondaryIndex = -1;
+			// 		if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+			// 		switch(secondaryIndex)
+			// 		{
+			// 			case 415:
+			// 			{ //reserve shooter minicrit on pyro
+			// 				if(TF2_IsPlayerInCondition(attacker,TFCond_BlastJumping))
+			// 					TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
+			// 			}
+			// 		}
+			// 	}
+			// }
 		}
 
 		if(damagetype & DMG_CLUB && GetClientTeam(victim) == GetClientTeam(attacker) && victim != attacker)
@@ -3594,8 +3644,8 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 				}
 				if(closest != -1)
 				{
-					if(attacker != inflictor) SDKHooks_TakeDamage(closest, attacker, attacker, damage, damagetype, inflictor, NULL_VECTOR, target_pos); //shield bash
-					else SDKHooks_TakeDamage(closest, attacker, inflictor, damage, damagetype, melee, NULL_VECTOR, target_pos); //otherwise
+					if(attacker != inflictor) SDKHooks_TakeDamage(closest, attacker, attacker, damage, damagetype, inflictor, NULL_VECTOR, target_pos, false); //shield bash
+					else SDKHooks_TakeDamage(closest, attacker, inflictor, damage, damagetype, melee, NULL_VECTOR, target_pos, false); //otherwise
 				}
 			}
 			return Plugin_Stop;
@@ -3714,7 +3764,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 						Address addr = TF2Attrib_GetByDefIndex(secondary,144);
 						float mode = TF2Attrib_GetValue(addr);
 						if(mode==2.0)
-							SDKHooks_TakeDamage(healer,0,0,damage/2.0,damagetype&~DMG_CRIT,-1,damageForce,damagePosition);
+							SDKHooks_TakeDamage(healer,0,0,damage/2.0,damagetype&~DMG_CRIT,-1,damageForce,damagePosition,false);
 					}
 				}
 			}
@@ -3925,7 +3975,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			}
 		}
 
-		if(weaponIndex==1180)
+		if(weaponIndex==1180 && !(damagetype & DMG_BURN == DMG_BURN))
 		{
 			//gas passer ignite damage
 			damage = 15.0;
@@ -4180,7 +4230,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 															TF2_AddCondition(i,TFCond_MarkedForDeathSilent,0.015);
 														}
 													}
-													SDKHooks_TakeDamage(i, inflictor, attacker, damage, damagetype |= DMG_SHOCK, weapon, damageForce, damagePosition);
+													SDKHooks_TakeDamage(i, inflictor, attacker, damage, damagetype |= DMG_SHOCK, weapon, damageForce, damagePosition, false);
 												}
 											}
 										}
@@ -4586,7 +4636,8 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 					{
 						SetVariantInt(RoundFloat(damage));
 						AcceptEntityInput(closest,"RemoveHealth");
-						EmitAmbientSound("misc/sniper_railgun_double_kill.wav",target_pos,closest,SNDLEVEL_TRAIN);
+						if(damage >= GetEntProp(closest, Prop_Send, "m_iHealth"))
+							EmitAmbientSound("misc/sniper_railgun_double_kill.wav",target_pos,closest,SNDLEVEL_TRAIN);
 					}
 				}
 			}
@@ -4649,55 +4700,58 @@ public void Event_SpawnAmmo(int entity)
 	if(StrContains(class,"ammo_pack") != -1)
 	{
 		int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-		if(IsValidClient(owner) && IS_HALLOWEEN)
+		if(IsValidClient(owner))
 		{
-			if(g_spawnPumpkin[owner] != 0)
+			if(IS_MEDIEVAL)
 			{
-				int team = GetClientTeam(g_spawnPumpkin[owner]);
-				SetEntProp(entity, Prop_Send, "m_iTeamNum", team);
-				SetEntityModel(entity,"models/props_halloween/pumpkin_loot.mdl");
-				float vel[3]; vel[2]=100.0;
-				TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,vel);
-				SDKHook(entity, SDKHook_Touch, ammoOnTouch);
-			}
-			else
-			{
-				int Ammopack = CreateEntityByName("item_ammopack_medium");
-				if(IsValidEdict(Ammopack))
+				int healthpack = CreateEntityByName("item_healthkit_small");
+				if(IsValidEdict(healthpack))
 				{
-					DispatchKeyValue(Ammopack, "OnPlayerTouch", "!self,Kill,,0,-1");
-					DispatchKeyValue(Ammopack, "targetname", "customAmmo");
-					float AmmoPos[3];
-					GetEntPropVector(owner, Prop_Send, "m_vecOrigin", AmmoPos);
-					AmmoPos[2]+=5;
-					TeleportEntity(Ammopack, AmmoPos, NULL_VECTOR, NULL_VECTOR);
+					// int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+					g_FilteredEntity = owner;
+					DispatchKeyValue(healthpack, "StartDisabled", "false");
+					DispatchKeyValue(healthpack, "AutoMaterialize", "false");
+					AcceptEntityInput(healthpack,"Enable");
+					SetEntData(healthpack,336,1,_,true); //m_spawnflags
+					SetEntData(healthpack,344,1,_,true); //m_fFlags
+					float position[3];
+					GetEntPropVector(owner, Prop_Send, "m_vecOrigin", position);
 
-					DispatchSpawn(Ammopack);
+					TeleportEntity(healthpack, position, NULL_VECTOR, NULL_VECTOR);
+					
+					DispatchSpawn(healthpack);
 					AcceptEntityInput(entity,"Kill");
-					CreateTimer(30.0, PackDelete, Ammopack);
+					CreateTimer(30.0, PackDelete, healthpack);
 				}
 			}
-		}
-		if(IS_MEDIEVAL)
-		{
-			int healthpack = CreateEntityByName("item_healthkit_small");
-			if(IsValidEdict(healthpack))
+			else if(IS_HALLOWEEN)
 			{
-				// int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
-				g_FilteredEntity = owner;
-				DispatchKeyValue(healthpack, "StartDisabled", "false");
-				DispatchKeyValue(healthpack, "AutoMaterialize", "false");
-				AcceptEntityInput(healthpack,"Enable");
-				SetEntData(healthpack,336,1,_,true); //m_spawnflags
-				SetEntData(healthpack,344,1,_,true); //m_fFlags
-				float position[3];
-				GetEntPropVector(owner, Prop_Send, "m_vecOrigin", position);
+				if(g_spawnPumpkin[owner] != 0)
+				{
+					int team = GetClientTeam(g_spawnPumpkin[owner]);
+					SetEntProp(entity, Prop_Send, "m_iTeamNum", team);
+					SetEntityModel(entity,"models/props_halloween/pumpkin_loot.mdl");
+					float vel[3]; vel[2]=100.0;
+					TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,vel);
+					SDKHook(entity, SDKHook_Touch, ammoOnTouch);
+				}
+				else
+				{
+					int Ammopack = CreateEntityByName("item_ammopack_medium");
+					if(IsValidEdict(Ammopack))
+					{
+						DispatchKeyValue(Ammopack, "OnPlayerTouch", "!self,Kill,,0,-1");
+						DispatchKeyValue(Ammopack, "targetname", "customAmmo");
+						float AmmoPos[3];
+						GetEntPropVector(owner, Prop_Send, "m_vecOrigin", AmmoPos);
+						AmmoPos[2]+=5;
+						TeleportEntity(Ammopack, AmmoPos, NULL_VECTOR, NULL_VECTOR);
 
-				TeleportEntity(healthpack, position, NULL_VECTOR, NULL_VECTOR);
-				
-				DispatchSpawn(healthpack);
-				AcceptEntityInput(entity,"Kill");
-				CreateTimer(30.0, PackDelete, healthpack);
+						DispatchSpawn(Ammopack);
+						AcceptEntityInput(entity,"Kill");
+						CreateTimer(30.0, PackDelete, Ammopack);
+					}
+				}
 			}
 		}
 	}
@@ -5443,7 +5497,7 @@ public void Phlog_SecondaryAttack(int entity,int client,float angles[3])
 										if(idx <= MaxClients)
 										{
 											if(GetClientTeam(idx)!=GetClientTeam(client))
-												SDKHooks_TakeDamage(idx, entity, client, 10.0, DMG_SHOCK, entity, NULL_VECTOR, target_pos);
+												SDKHooks_TakeDamage(idx, entity, client, 10.0, DMG_SHOCK, entity, NULL_VECTOR, target_pos, false);
 											else{
 												if(TF2_IsPlayerInCondition(idx,TFCond_OnFire)){
 													TF2_RemoveCondition(idx,TFCond_OnFire);
@@ -5544,8 +5598,8 @@ public Action CaberTauntkill(Handle timer, int client)
 				SetEntProp(melee, Prop_Send, "m_bBroken",1);
 				CreateParticle(client,"ExplosionCore_MidAir",5.0,_,_,_,_,_,_,false);
 				EmitAmbientSound("weapons/explode2.wav",player_pos,client);
-				SDKHooks_TakeDamage(client, melee, client, 100.0, DMG_BLAST, melee, blastVec, impact_pos);
-				SDKHooks_TakeDamage(closest, melee, client, 500.0, DMG_BLAST, melee, blastVec, impact_pos);
+				SDKHooks_TakeDamage(client, melee, client, 100.0, DMG_BLAST, melee, blastVec, impact_pos, false);
+				SDKHooks_TakeDamage(closest, melee, client, 500.0, DMG_BLAST, melee, blastVec, impact_pos, false);
 				for(idx = 1; idx < MaxClients; idx++)
 				{
 					if(IsClientInGame(idx) && idx != closest)
@@ -5555,7 +5609,7 @@ public Action CaberTauntkill(Handle timer, int client)
 							GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
 							distance = GetVectorDistance(impact_pos, target_pos);
 							if(distance < 126.0)
-								SDKHooks_TakeDamage(idx, melee, client, 100.0+50.0*((125-distance)/125.0), DMG_BLAST, melee, blastVec, impact_pos);
+								SDKHooks_TakeDamage(idx, melee, client, 100.0+50.0*((125-distance)/125.0), DMG_BLAST, melee, blastVec, impact_pos, false);
 						}
 					}
 				}
@@ -5563,7 +5617,7 @@ public Action CaberTauntkill(Handle timer, int client)
 			else
 			{
 				EmitAmbientSound("weapons/bottle_impact_hit_flesh1.wav",player_pos,client);
-				SDKHooks_TakeDamage(closest, melee, client, 55.0, DMG_CLUB, melee, NULL_VECTOR, impact_pos);
+				SDKHooks_TakeDamage(closest, melee, client, 55.0, DMG_CLUB, melee, NULL_VECTOR, impact_pos, false);
 			}
 		}
 	}
@@ -5623,7 +5677,7 @@ public Action SMGTauntkill(Handle timer, int client)
 		}
 		if(closest != -1)
 		{
-			SDKHooks_TakeDamage(closest, secondary, client, 65.0, DMG_CLUB, secondary, NULL_VECTOR, impact_pos);
+			SDKHooks_TakeDamage(closest, secondary, client, 65.0, DMG_CLUB, secondary, NULL_VECTOR, impact_pos, false);
 		}
 	}
 	return Plugin_Continue;
@@ -5656,7 +5710,7 @@ public void NeonExplosion(DataPack pack)
 						damage = 75.0;
 					else if (TF2_IsPlayerInCondition(idx,TFCond_Gas) || TF2_IsPlayerInCondition(idx,TFCond_Milked) || TF2_IsPlayerInCondition(idx,TFCond_Jarated))
 						damagetype |= DMG_CRIT;
-					SDKHooks_TakeDamage(idx, client, client, damage, damagetype, melee, force_vec, player_pos);
+					SDKHooks_TakeDamage(idx, client, client, damage, damagetype, melee, force_vec, player_pos, false);
 				}
 			}
 		}
@@ -5773,7 +5827,7 @@ public void VolcanoBurst(DataPack pack)
 		GetEntPropVector(victim, Prop_Send, "m_vecOrigin", targetPos);
 		int burnerMelee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
 
-		SDKHooks_TakeDamage(victim, attacker, attacker, 18.0, DMG_IGNITE | DMG_BURN, burnerMelee, NULL_VECTOR, targetPos);
+		SDKHooks_TakeDamage(victim, attacker, attacker, 18.0, DMG_IGNITE | DMG_BURN, burnerMelee, NULL_VECTOR, targetPos, false);
 		if(TF2_GetPlayerClass(victim) != TFClass_Pyro) TF2Util_SetPlayerBurnDuration(victim,7.5);
 	}
 }
@@ -6193,7 +6247,7 @@ Action flareTouch(int entity, int other)
 				//apply force from orb velocity and distance from orb
 				TeleportEntity(owner,NULL_VECTOR,NULL_VECTOR,vel);
 				TeleportEntity(owner,NULL_VECTOR,NULL_VECTOR,force);
-				SDKHooks_TakeDamage(owner, owner, owner, damage, type, weapon, NULL_VECTOR, flarePos);
+				SDKHooks_TakeDamage(owner, owner, owner, damage, type, weapon, NULL_VECTOR, flarePos, false);
 				TF2_AddCondition(owner,TFCond_BlastJumping,3.0);
 			}
 		}
@@ -6317,7 +6371,7 @@ void AirblastPush(int client)
 	vel[0]+=force[0]; vel[1]+=force[1]; vel[2]+=force[2];
 
 	TeleportEntity(client,_,_,vel);
-	TF2_AddCondition(client,TFCond_BlastJumping,3.0);
+	TF2_AddCondition(client,TFCond_BlastJumping);
 }
 
 // Action projSpawn(int entity){
@@ -6450,7 +6504,7 @@ public Action KillNeighbor(Handle timer, int neighbor)
 						type |= DMG_CRIT;
 					}
 				}
-				SDKHooks_TakeDamage(j, owner, owner, damage, type, weapon, NULL_VECTOR, pos2);
+				SDKHooks_TakeDamage(j, owner, owner, damage, type, weapon, NULL_VECTOR, pos2, false);
 			}
 		}
 	}
@@ -6551,4 +6605,35 @@ stock bool IsHalloweenMap(const char[] mapname)
 {
 	int mapIndex = FindStringInArray(g_Maplist, mapname);
 	return (mapIndex > -1);
+}
+
+public void SpawnSpooky(int victim)
+{
+	int skeleton = CreateEntityByName("tf_zombie");
+	if(IsValidEntity(skeleton))
+	{
+		DispatchKeyValue(skeleton, "targetname", "tf_zombie");
+		int team = GetEntProp(victim, Prop_Send, "m_iTeamNum")==3 ? 2 : 3;
+		SetEntProp(skeleton, Prop_Send, "m_iTeamNum", team);
+		if(team==2)
+			DispatchKeyValue(skeleton, "skin", "0");
+		else
+			DispatchKeyValue(skeleton, "skin", "1");
+		float victimPos[3];
+		GetEntPropVector(victim, Prop_Send, "m_vecOrigin", victimPos);
+		TeleportEntity(skeleton, victimPos, NULL_VECTOR, NULL_VECTOR);
+		DispatchSpawn(skeleton);
+		EmitAmbientSound("misc/halloween/spell_skeleton_horde_cast.wav",victimPos,skeleton);
+		CreateTimer(15.0,KillSpooky,skeleton);
+	}
+}
+
+public Action KillSpooky(Handle timer, int skeleton)
+{
+	//reset afterburn immunity on spy-cicle
+	if (IsValidEntity(skeleton))
+	{
+		AcceptEntityInput(skeleton,"Kill");
+	}
+	return Plugin_Continue;
 }
