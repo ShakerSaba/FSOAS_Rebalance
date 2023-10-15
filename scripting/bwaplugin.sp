@@ -1468,10 +1468,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 							int clip = GetEntData(secondary, iAmmoTable, 4);
 							int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
 							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
-							if(ammoCount>0 && (clip<8 || clip<4 && primaryIndex==1150))
+							if(ammoCount>0 && (clip<8 || clip<4 && secondaryIndex==1150))
 							{
 								replenished = true;
-								SetEntData(primary, iAmmoTable, clip+1, _, true);
+								SetEntData(secondary, iAmmoTable, clip+1, _, true);
 								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
 							}
 						}
@@ -1679,7 +1679,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					int clip = GetEntData(primary, iAmmoTable, 4);
 					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-					if(ammoCount>0 && (clip<4 || clip<2 && primaryIndex==308))
+					if(ammoCount>0 && (clip<4 && primaryIndex!=308 || clip<2 && primaryIndex==308))
 					{
 						replenished = true;
 						SetEntData(primary, iAmmoTable, clip+1, _, true);
@@ -1692,10 +1692,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					int clip = GetEntData(secondary, iAmmoTable, 4);
 					int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
 					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
-					if(ammoCount>0 && (clip<8 || clip<4 && primaryIndex==1150))
+					if(ammoCount>0 && (clip<8 && secondaryIndex!=1150 || clip<4 && secondaryIndex==1150))
 					{
 						replenished = true;
-						SetEntData(primary, iAmmoTable, clip+1, _, true);
+						SetEntData(secondary, iAmmoTable, clip+1, _, true);
 						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
 					}
 				}
