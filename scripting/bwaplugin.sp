@@ -59,7 +59,7 @@ float PARACHUTE_TIME = 6.0;
 float FIRE_TIME = 3.0;
 // float SODA_DAMAGE = 10.0;
 float PRESSURE_TIME = 6.0;
-float PRESSURE_FORCE = 2.25;
+float PRESSURE_FORCE = 2.5;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
 #define TF_CONDFLAG_VACCMAX      	(1 << 2)
@@ -221,6 +221,7 @@ public void OnMapStart()
 	PrecacheSound("misc/banana_slip.wav",true);
 	PrecacheSound("misc/sniper_railgun_double_kill.wav",true);
 	PrecacheSound("weapons/tf2_backshot_shotty.wav",true);
+	PrecacheSound("items/ammo_pickup.wav",true);
 	PrecacheModel("models/weapons/w_models/w_syringe_proj.mdl",true);
 	PrecacheModel("models/weapons/c_models/c_leechgun/c_leech_proj.mdl",true);
 	PrecacheModel("models/workshop/weapons/c_models/c_chocolate/plate_chocolate.mdl",true);
@@ -1020,19 +1021,21 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
 						ShowHudText(iClient,4,"Caber: 100 %");
 						SetEntPropFloat(melee, Prop_Send, "m_flLastFireTime",gameTime);
+						TF2Attrib_SetByDefIndex(melee,773,1.75); //deploy time increased
 					}
 					//Neon Annihilator
 					case 813, 834:
 					{
 						TF2Attrib_SetByDefIndex(melee,146,0.0); //damage applies to sappers
-						TF2Attrib_SetByDefIndex(melee,773,1.5); //deploy time increased
+						TF2Attrib_SetByDefIndex(melee,773,1.75); //deploy time increased
 						TF2Attrib_SetByDefIndex(melee,264,1.5); //melee range multiplier
-						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-						SetEntProp(melee, Prop_Send, "m_bBroken",1);
 						if(strcmp(event,"player_spawn") == 0)
 						{
-							g_meterMel[iClient] = 0.0;
+							SetEntProp(melee, Prop_Send, "m_bBroken",0);
+							g_meterMel[iClient] = 100.0;
 						}
+						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
+						ShowHudText(iClient,4,"CHARGE: %.0f%",g_meterMel[iClient]);
 					}
 					//Disciplinary Action
 					case 447:
@@ -1444,6 +1447,35 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 					case 327: //claidheamh mor
 					{
 						addCharge += 25;
+						bool replenished = false;
+						//check ammo to be replenished
+						if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
+						{
+							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							int clip = GetEntData(primary, iAmmoTable, 4);
+							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+							if(ammoCount>0 && (clip<4 || clip<2 && primaryIndex==308))
+							{
+								replenished = true;
+								SetEntData(primary, iAmmoTable, clip+1, _, true);
+								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+							}
+						}
+						if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
+						{
+							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							int clip = GetEntData(secondary, iAmmoTable, 4);
+							int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
+							if(ammoCount>0 && (clip<8 || clip<4 && primaryIndex==1150))
+							{
+								replenished = true;
+								SetEntData(primary, iAmmoTable, clip+1, _, true);
+								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
+							}
+						}
+						if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
 					}
 					case 43: //KGB
 					{
@@ -1478,6 +1510,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 						if(ammoCount>0)
 						{
+							EmitSoundToClient(attacker,"items/ammo_pickup.wav");
 							SetEntData(primary, iAmmoTable, clip+1, _, true);
 							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
 						}
@@ -1631,13 +1664,46 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 				if(ammoCount>0)
 				{
+					EmitSoundToClient(attacker,"items/ammo_pickup.wav");
 					SetEntData(primary, iAmmoTable, clip+1, _, true);
 					SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
 				}
 			}
+			case 327: //claidheamh mor on-kill
+			{
+				bool replenished = false;
+				//check ammo to be replenished
+				if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
+				{
+					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+					int clip = GetEntData(primary, iAmmoTable, 4);
+					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+					if(ammoCount>0 && (clip<4 || clip<2 && primaryIndex==308))
+					{
+						replenished = true;
+						SetEntData(primary, iAmmoTable, clip+1, _, true);
+						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+					}
+				}
+				if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
+				{
+					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+					int clip = GetEntData(secondary, iAmmoTable, 4);
+					int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
+					if(ammoCount>0 && (clip<8 || clip<4 && primaryIndex==1150))
+					{
+						replenished = true;
+						SetEntData(primary, iAmmoTable, clip+1, _, true);
+						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
+					}
+				}
+				if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
+			}
 			case 939: //spooky skeleton
 			{
-				if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
+				if(IS_HALLOWEEN && attacker!=victim) RequestFrame(SpawnSpooky,victim);
 			}
 		}
 
@@ -1921,31 +1987,9 @@ public void OnGameFrame()
 					if(primaryIndex != 594 && primaryIndex !=1 && primary!=-1) //handle airblast, except for dragon's fury and phlog
 					{
 						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
-						float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
+						// float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
 						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-						if(weaponState==3) //in-airblast
-						{
-							if((primaryIndex != 1178 && meter2 < meter) || (primaryIndex == 1178 && meter == 0.0)) //done to make limit it to first frame in this state
-							{
-								float vel[3];
-								GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
-								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND)))
-								{
-									if(!(primaryIndex == 1178 && meter!=0.0))
-										AirblastPush(iClient);
-								}
-								if(primaryIndex != 1178)
-								{
-									meter-=33.0;
-									if(meter<0.0) meter = 0.0;
-									//update pressure meter
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
-									TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200); //set next airblast force
-								}
-							}
-						}
-						else if(weaponState!=3 && primaryIndex != 1178) //out of airblast
+						if(weaponState!=3 && primaryIndex != 1178) //out of airblast
 						{
 							//update pressure meter
 							if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+100.0/(66*PRESSURE_TIME), 0);
@@ -2875,6 +2919,34 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 								TF2Attrib_SetByDefIndex(iClient,201,1.5); //speed up phlog taunt speed
 						}
 					}
+					else //other airblast alt-fire
+					{
+						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
+						float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
+						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+						if(weaponState==3) //in-airblast
+						{
+							if((primaryIndex != 1178 && meter2 < meter) || (primaryIndex == 1178 && meter == 0.0)) //done to make limit it to first frame in this state
+							{
+								// float vel[3];
+								// GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
+								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
+								{
+									if(!(primaryIndex == 1178 && meter!=0.0))
+										AirblastPush(iClient);
+								}
+								if(primaryIndex != 1178)
+								{
+									meter-=33.0;
+									if(meter<0.0) meter = 0.0;
+									//update pressure meter
+									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
+									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
+									TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200); //set next airblast force
+								}
+							}
+						}
+					}
 				}
 				// manmelter
 				if(secondaryIndex == 595 && curr==secondary)
@@ -3110,7 +3182,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				// 		buttons &= ~IN_ATTACK2;
 				// 	}
 				// }
-				else if (curr == secondary && secondaryIndex==411) //quick-fix
+				if (curr == secondary && secondaryIndex==411) //quick-fix
 				{
 					//pop uber
 					float atk = GetEntPropFloat(secondary, Prop_Send, "m_flNextSecondaryAttack");
@@ -3521,23 +3593,23 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 					}
 				}
 			}
-			// case TFClass_Pyro:
-			// {
-			// 	if(damagetype & DMG_BUCKSHOT)
-			// 	{
-			// 		int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
-			// 		int secondaryIndex = -1;
-			// 		if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-			// 		switch(secondaryIndex)
-			// 		{
-			// 			case 415:
-			// 			{ //reserve shooter minicrit on pyro
-			// 				if(TF2_IsPlayerInCondition(attacker,TFCond_BlastJumping))
-			// 					TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
-			// 			}
-			// 		}
-			// 	}
-			// }
+			case TFClass_Pyro:
+			{
+				if(damagetype & DMG_BUCKSHOT)
+				{
+					int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+					int secondaryIndex = -1;
+					if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+					switch(secondaryIndex)
+					{
+						case 415:
+						{ //reserve shooter minicrit on pyro
+							if(TF2_IsPlayerInCondition(attacker,TFCond_BlastJumping))
+								TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
+						}
+					}
+				}
+			}
 		}
 
 		if(damagetype & DMG_CLUB && GetClientTeam(victim) == GetClientTeam(attacker) && victim != attacker)
@@ -3791,7 +3863,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 			}
 			case 304: //amputator heal radius on-hit
 			{
-				if(damage>0)
+				if(damage>0/* && !TF2_IsPlayerInCondition(victim,TFCond_Disguised) && !TF2_IsPlayerInCondition(victim,TFCond_Cloaked)*/)
 				{
 					TF2_AddCondition(attacker,TFCond_RadiusHealOnDamage,1.0);
 				}
@@ -3818,18 +3890,18 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 				}
 			}
 		}
-	}
-	if(GetClientHealth(victim)<=0 && victim != attacker && IS_HALLOWEEN)
-	{
-		int resource = GetPlayerResourceEntity();
-		if (resource != -1)
+		if(GetClientHealth(victim)<=0 && victim != attacker && IS_HALLOWEEN)
 		{
-			int atkScore = GetEntProp(resource, Prop_Send, "m_iScore", _, attacker);
-			int vicScore = GetEntProp(resource, Prop_Send, "m_iScore", _, victim);
-
-			if(atkScore<vicScore)
+			int resource = GetPlayerResourceEntity();
+			if (resource != -1)
 			{
-				g_spawnPumpkin[victim] = attacker;
+				int atkScore = GetEntProp(resource, Prop_Send, "m_iScore", _, attacker);
+				int vicScore = GetEntProp(resource, Prop_Send, "m_iScore", _, victim);
+
+				if(atkScore>vicScore)
+				{
+					g_spawnPumpkin[victim] = attacker;
+				}
 			}
 		}
 	}
@@ -4731,6 +4803,10 @@ public void Event_SpawnAmmo(int entity)
 					int team = GetClientTeam(g_spawnPumpkin[owner]);
 					SetEntProp(entity, Prop_Send, "m_iTeamNum", team);
 					SetEntityModel(entity,"models/props_halloween/pumpkin_loot.mdl");
+					if(team==2)
+						CreateParticle(entity,"burningplayer_glow",30.0,_,_,_,_,_,_,true,false,false);
+					if(team==3)
+						CreateParticle(entity,"burningplayer_glow_blue",30.0,_,_,_,_,_,_,true,false,false);
 					float vel[3]; vel[2]=100.0;
 					TeleportEntity(entity,NULL_VECTOR,NULL_VECTOR,vel);
 					SDKHook(entity, SDKHook_Touch, ammoOnTouch);
@@ -5192,7 +5268,7 @@ public void ExtinguishEnemy(int client)
 	TF2_RemoveCondition(client,TFCond_OnFire);
 }
 
-stock void CreateParticle(int ent, char[] particleType, float time,float angleX=0.0,float angleY=0.0,float Xoffset=0.0,float Yoffset=0.0,float Zoffset=0.0,float size=1.0,bool update=true,bool parent=true,bool attach=false,float angleZ=0.0,int owner=-1)
+stock int CreateParticle(int ent, char[] particleType, float time,float angleX=0.0,float angleY=0.0,float Xoffset=0.0,float Yoffset=0.0,float Zoffset=0.0,float size=1.0,bool update=true,bool parent=true,bool attach=false,float angleZ=0.0,int owner=-1)
 {
 	int particle = CreateEntityByName("info_particle_system");
 
@@ -5260,6 +5336,7 @@ stock void CreateParticle(int ent, char[] particleType, float time,float angleX=
 		else
 			CreateTimer(time, DeleteParticle, particle);
 	}
+	return particle;
 }
 
 public Action DeleteParticle(Handle timer, int particle)
@@ -5351,6 +5428,10 @@ public Action UpdateParticle(Handle timer, DataPack pack)
 						g_flameHit[particle] = time;
 				}
 				g_flameHit[particle] += 0.075;
+			}
+			else if(!IsValidEdict(parent))
+			{
+				CreateTimer(0.015, DeleteParticle, particle);
 			}
 		}
 		else
@@ -6357,7 +6438,7 @@ void AirblastPush(int client)
 	meter *= PRESSURE_FORCE;
 	if (primaryIndex==40||primaryIndex==1146)
 	{
-		meter *= 1.5;
+		meter *= 1.33;
 	}
 	float force[3],angles[3],vel[3];
 	GetEntPropVector(client, Prop_Data, "m_vecVelocity",vel);
