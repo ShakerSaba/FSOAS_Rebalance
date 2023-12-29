@@ -309,6 +309,7 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 		else if(StrEqual(classname,"item_teamflag")) //m_nFlagStatus
 		{
 			SDKHook(iEnt, SDKHook_Think, FlagThink);
+			SDKHook(iEnt, SDKHook_Touch, FlagTouch);
 			g_flagTime[iEnt] = 0.0;
 		}
 		else if(StrEqual(classname,"tf_flame_manager"))
@@ -986,6 +987,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					{
 						TF2Attrib_SetByDefIndex(melee,61,1.0); //dmg taken from fire increased
 						TF2Attrib_SetByDefIndex(melee,345,4.0); //engy dispenser radius increased
+						TF2Attrib_SetByDefIndex(melee,2043,0.8); //upgrade rate decrease
 						// TF2Attrib_SetByDefIndex(melee,81,0.75); //maxammo metal reduced
 						// TF2Attrib_SetByDefIndex(melee,148,0.745); //building cost reduction
 						// SetEntData(iClient, FindDataMapInfo(iClient, "m_iAmmo") + (3 * 4), 150, 4);
@@ -1187,7 +1189,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						TF2Attrib_SetByDefIndex(melee,5,1.2); //fire rate penalty
 						// TF2Attrib_SetByDefIndex(melee,795,1.35); //damage bonus vs burning
 						// TF2Attrib_SetByDefIndex(melee,110,30.0); //heal on hit for slowfire
-						// TF2Attrib_SetByDefIndex(melee,360,1.0); //damage all connected
+						TF2Attrib_SetByDefIndex(melee,360,0.0); //damage all connected
 					}
 					//The Shahanshah
 					case 401:
@@ -3766,23 +3768,23 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 					}
 				}
 			}
-			case TFClass_Pyro:
-			{
-				if(damagetype & DMG_BUCKSHOT)
-				{
-					int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
-					int secondaryIndex = -1;
-					if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-					switch(secondaryIndex)
-					{
-						case 415:
-						{ //reserve shooter minicrit on pyro
-							if(TF2_IsPlayerInCondition(attacker,TFCond_BlastJumping))
-								TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
-						}
-					}
-				}
-			}
+			// case TFClass_Pyro:
+			// {
+			// 	if(damagetype & DMG_BUCKSHOT)
+			// 	{
+			// 		int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+			// 		int secondaryIndex = -1;
+			// 		if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+			// 		switch(secondaryIndex)
+			// 		{
+			// 			case 415:
+			// 			{ //reserve shooter minicrit on pyro
+			// 				if(TF2_IsPlayerInCondition(attacker,TFCond_BlastJumping))
+			// 					TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
+			// 			}
+			// 		}
+			// 	}
+			// }
 		}
 
 		if(damagetype & DMG_CLUB && GetClientTeam(victim) == GetClientTeam(attacker) && victim != attacker)
@@ -4027,7 +4029,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 			case 41: //natascha heal on hit
 			{
 				float dist = getPlayerDistance(attacker,victim);
-				if(dist < 1024)
+				if(dist < 1024 && damage > 0.0 && !TF2_IsPlayerInCondition(victim,TFCond_Ubercharged) && !TF2_IsPlayerInCondition(victim,TFCond_UberchargeFading) && !TF2_IsPlayerInCondition(victim,TFCond_UberchargedCanteen))
 				{
 					float healing = dist < 256.0 ? 8.0 : 7.0*((1024-dist)/768.0) + 1.0;
 					TF2Util_TakeHealth(attacker,healing);
@@ -4206,7 +4208,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			// 	damage = 0.01;
 		}
 
-		if(StrEqual("tf_weapon_flamethrower",weaponName) && (damagetype & DMG_IGNITE) && !(damagetype & DMG_BLAST))
+		if(StrEqual("tf_weapon_flamethrower",weaponName) && (damagetype & DMG_IGNITE) && !(damagetype & DMG_BLAST) && damagecustom != TF_CUSTOM_TAUNT_ARMAGEDDON)
 		{
 			//recreate flamethrower damage scaling, code inpsired by NotnHeavy
 			//base damage plus any bonus
@@ -4391,10 +4393,17 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						if(damagetype & DMG_SHOCK)
 						{
 							// damagetype &= ~DMG_SHOCK;
-							if(damagetype & DMG_CRIT && !isKritzed(attacker))
+							if(damagetype & DMG_CRIT && !isKritzed(attacker) && !isMiniKritzed(attacker,victim))
 							{
 								damagecustom = TF_CUSTOM_HEADSHOT;
 							}
+							
+						}
+						float charge = GetEntPropFloat(weapon, Prop_Send, "m_flChargedDamage");
+						if(charge>50)
+						{
+							charge -= 50;
+							damage *= 1+((charge/100)*(1.0/6));
 						}
 					}
 				}
@@ -4406,9 +4415,9 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					case 813, 834:
 					{
 						//neon explosion if intact
-						int broken = GetEntProp(weapon, Prop_Send, "m_bBroken");
-						if(broken==0){
+						if(g_meterMel[attacker]>=100.0){
 							g_meterMel[attacker] = 0.0;
+							SetEntProp(weapon, Prop_Send, "m_bBroken",1);
 
 							int team = GetEntProp(attacker, Prop_Data, "m_iTeamNum");
 							if(team == 3)
@@ -4416,7 +4425,6 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 							else if(team == 2)
 								CreateParticle(victim,"drg_cow_explosioncore_charged",3.0,_,_,_,_,_,3.0,false);
 							EmitAmbientSound("mvm/giant_soldier/giant_soldier_explode.wav",damagePosition,victim);
-							SetEntProp(weapon, Prop_Send, "m_bBroken",1);
 							DataPack pack = new DataPack();
 							pack.Reset();
 							pack.WriteCell(attacker);
@@ -5466,7 +5474,7 @@ public Action chocolateHeal(Handle timer, int iClient)
 		if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
 		if(IsPlayerAlive(iClient) && (secondaryIndex == 159 || secondaryIndex == 433) && GetClientHealth(iClient)<350)
 		{
-			TF2Util_TakeHealth(iClient,35.0);
+			TF2Util_TakeHealth(iClient,25.0);
 		}
 	}
 	return Plugin_Continue;
@@ -6254,6 +6262,20 @@ Action FlagThink(int flag) //flag logic, detect nearby teammates when dropped an
 					g_flagTime[flag] = 0.0;
 				}
 			}
+		}
+	}
+	return Plugin_Continue;
+}
+
+Action FlagTouch(int flag, int other)
+{
+	if(IsValidClient(other))
+	{
+		int flagTeam = GetEntProp(flag, Prop_Send, "m_iTeamNum");
+		int clientTeam = GetClientTeam(other);
+		if(flagTeam != clientTeam && IsPlayerAlive(other))
+		{
+			//block capture if enemy is 
 		}
 	}
 	return Plugin_Continue;
