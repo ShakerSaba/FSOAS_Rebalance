@@ -5947,7 +5947,7 @@ public Action UpdateParticle(Handle timer, DataPack pack)
 								{
 									float targetpos[3],flamepos[3];
 									GetEntPropVector(idx, Prop_Send, "m_vecOrigin", targetpos);
-									if(GetClientTeam(owner) != GetClientTeam(idx))
+									if(GetClientTeam(owner) != GetClientTeam(idx) && IsPlayerAlive(idx))
 									{
 										GetEntPropVector(particle, Prop_Send, "m_vecOrigin", flamepos);
 										float distance = GetVectorDistance(flamepos,targetpos);
