@@ -33,7 +33,7 @@ int g_consecHits[MAXPLAYERS+1];
 int g_condFlags[MAXPLAYERS+1];
 int g_lastHeal[MAXPLAYERS+1];
 int g_lockOn[MAXPLAYERS+1];
-int g_Fov[MAXPLAYERS+1];
+// int g_Fov[MAXPLAYERS+1];
 int g_spawnPumpkin[MAXPLAYERS+1];
 // int g_healing[MAXPLAYERS+1];
 int g_bisonHit[2048];
@@ -51,6 +51,7 @@ float g_meterMel[MAXPLAYERS+1];
 float g_lastVoice[MAXPLAYERS+1];
 float g_lastVaccHeal[MAXPLAYERS+1];
 float g_flameDamage[MAXPLAYERS+1];
+float g_syringeHit[MAXPLAYERS+1];
 float g_flameHit[2048];
 float g_flagTime[2048];
 
@@ -82,6 +83,7 @@ float PRESSURE_FORCE = 2.5;
 #define TF_CONDFLAG_FANHIT			(1 << 14)
 #define TF_CONDFLAG_FANFLY			(1 << 15)
 #define TF_CONDFLAG_BLJUMP			(1 << 16)
+#define TF_CONDFLAG_CAPPING			(1 << 17)
 
 #define EF_BONEMERGE                (1 << 0)
 #define EF_NOSHADOW                 (1 << 4)
@@ -352,6 +354,16 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 		{
 			AcceptEntityInput(iEnt,"Kill");
 			IS_MEDIEVAL = true;
+		}
+		else if(StrEqual(classname, "tf_logic_medieval"))
+		{
+			AcceptEntityInput(iEnt,"Kill");
+			IS_MEDIEVAL = true;
+		}
+		else if(StrEqual(classname, "trigger_capture_area"))
+		{
+			SDKHook(iEnt, SDKHook_StartTouch, PointTouchStart);
+			SDKHook(iEnt, SDKHook_EndTouch, PointTouchEnd);
 		}
 		// else if(StrEqual(classname, "team_train_watcher")) //payload
 		// {
@@ -624,6 +636,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 312:
 			{
 				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
+				TF2Attrib_SetByDefIndex(primary,68,-1.0);//capture rate
 				// TF2Attrib_SetByDefIndex(primary,86,1.4/0.814); //spinup time penalty
 				// TF2Attrib_SetByDefIndex(primary,86,1.4); //spinup time penalty
 				// TF2Attrib_SetByDefIndex(primary,199,0.8); //holster speed bonus
@@ -731,8 +744,9 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, 2, _, true);
 				TF2Attrib_SetByDefIndex(primary,96,1.35); //Reload time increased
-				TF2Attrib_SetByDefIndex(primary,114,1.0); //mini-crit airborne
 				TF2Attrib_SetByDefIndex(primary,137,1.0); //dmg bonus vs buildings
+				TF2Attrib_SetByDefIndex(primary,138,1.15); //damage bonus vs players
+				// TF2Attrib_SetByDefIndex(primary,114,1.0); //mini-crit airborne
 			}
 			//Sydney Sleeper
 			case 230:
@@ -1324,7 +1338,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					//Pain Train
 					case 154:
 					{
-						TF2Attrib_SetByDefIndex(melee,125,-15.0); //max health additive penalty
+						TF2Attrib_SetByDefIndex(melee,412,1.1); //dmg taken increased
 						TF2Attrib_SetByDefIndex(melee,67,1.0); //dmg taken from bullets increased
 					}
 				}
@@ -1446,9 +1460,10 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_lastVaccHeal[iClient] = 0.0;
 		g_flameDamage[iClient] = 0.0;
 		g_flameAttacker[iClient] = 0;
+		g_syringeHit[iClient] = 0.0;
 		
-		if(StrContains(event,"player_spawn") != -1) g_Fov[iClient] = GetEntProp(iClient, Prop_Send, "m_iFOV");
-		SetEntProp(iClient, Prop_Send, "m_iFOV", g_Fov[iClient]);
+		// if(StrContains(event,"player_spawn") != -1) g_Fov[iClient] = GetEntProp(iClient, Prop_Send, "m_iFOV");
+		// SetEntProp(iClient, Prop_Send, "m_iFOV", g_Fov[iClient]);
 		TF2Attrib_SetByDefIndex(iClient,69,1.0); //set attr indexes for third degree
 		SetEntityGravity(iClient,1.0); //reset jetpack gravity;
 	}
@@ -1606,9 +1621,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 						if(ammoCount>0)
 						{
+							int amount = ammoCount > 1 && clip < 7 ? 2 : 1;
 							EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-							SetEntData(primary, iAmmoTable, clip+1, _, true);
-							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+							SetEntData(primary, iAmmoTable, clip+amount, _, true);
+							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
 						}
 					}
 					case 939: //spooky skeleton
@@ -1749,9 +1765,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 				if(ammoCount>0)
 				{
+					int amount = ammoCount > 1 && clip < 7 ? 2 : 1;
 					EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-					SetEntData(primary, iAmmoTable, clip+1, _, true);
-					SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+					SetEntData(primary, iAmmoTable, clip+amount, _, true);
+					SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
 				}
 			}
 			case 327: //claidheamh mor on-kill
@@ -1799,11 +1816,26 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 			if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
 		}
 
-		//marked speed buff for Fan of War
-		if(TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeath)==attacker)
+		switch(meleeIndex)
 		{
-			TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+			case 355:
+			{
+				//marked speed buff for Fan O'War
+				if(TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeath)==attacker)
+				{
+					TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+				}
+			}
+			case 154:
+			{
+				//speed boost for killing user on objective Pain Train
+				if(g_condFlags[victim] & TF_CONDFLAG_CAPPING)
+				{
+					TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+				}
+			}
 		}
+		
 	}
 	
 	if(g_condFlags[victim] & TF_CONDFLAG_VOLCANO) //sharpened volcano, if player hit while burning dies they explode
@@ -1974,43 +2006,47 @@ public void OnGameFrame()
 				if(intel==0.0&&capture==0.0)
 				{
 					TF2Attrib_SetByDefIndex(iClient,400,1.0);
-					if(TF2_GetPlayerClass(iClient)==TFClass_Scout || meleeIndex==154)
+					if(TF2_GetPlayerClass(iClient)==TFClass_Scout || meleeIndex==154) //scouts and pain train
 						TF2Attrib_SetByDefIndex(iClient,68,-2.0);
-					else
+					else if (primaryIndex != 312) //exclude brass beast
 						TF2Attrib_SetByDefIndex(iClient,68,-1.0);
 					FakeClientCommand(iClient,"dropitem");
 				}
 
-				//regenerate HP
-				//don't heal if connected to medigun
-				float interval = 0.045; //if connected to level 1 dispenser: 0.075; level 2 dispenser: 0.135; level 3 dispenser: 0.24
+				//vacc regenerate HP
+				float interval = 0.045; 
 				bool heal = true;
-				if(TF2_IsPlayerInCondition(iClient,TFCond_Healing))
+				if(g_lastVaccHeal[iClient]!=-1.0) //medic can't heal himself
 				{
-					int healer = TF2Util_GetPlayerConditionProvider(iClient,TFCond_Healing);
-					for(int idx; idx <= MaxClients; idx++)
+					if(TF2_IsPlayerInCondition(iClient,TFCond_Healing))
 					{
-						if(GetHealingTarget(idx)==iClient)
+						int healer = TF2Util_GetPlayerConditionProvider(iClient,TFCond_Healing);
+						//don't heal if connected to medigun
+						for(int idx; idx <= MaxClients; idx++)
 						{
-							heal = false;
+							if(GetHealingTarget(idx)==iClient)
+							{
+								heal = false;
+							}
+						}
+						//if connected to level 1 dispenser: 0.075; level 2 dispenser: 0.135; level 3 dispenser: 0.24
+						char class[64];
+						GetEntityClassname(healer,class,64);
+						if(heal & StrEqual(class,"obj_dispenser"))
+						{
+							switch(GetEntProp(healer, Prop_Send,"m_iUpgradeLevel"))
+							{
+								case 1: interval = 0.075;
+								case 2: interval = 0.135;
+								case 3: interval = 0.24;
+							}
 						}
 					}
-					char class[64];
-					GetEntityClassname(healer,class,64);
-					if(heal & StrEqual(class,"obj_dispenser"))
+					if(heal && g_lastVaccHeal[iClient]+interval<=GetGameTime())
 					{
-						switch(GetEntProp(healer, Prop_Send,"m_iUpgradeLevel"))
-						{
-							case 1: interval = 0.075;
-							case 2: interval = 0.135;
-							case 3: interval = 0.24;
-						}
+						g_lastVaccHeal[iClient] = GetGameTime();
+						TF2Util_TakeHealth(iClient,1.0);
 					}
-				}
-				if(heal && g_lastVaccHeal[iClient]+interval<=GetGameTime())
-				{
-					g_lastVaccHeal[iClient] = GetGameTime();
-					TF2Util_TakeHealth(iClient,1.0);
 				}
 			}
 			else
@@ -2897,6 +2933,10 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 		}
 		case TFCond_UberFireResist,TFCond_UberBulletResist,TFCond_UberBlastResist:
 		{
+			if(provider==iClient)
+				g_lastVaccHeal[iClient] = -1.0;
+			else
+				g_lastVaccHeal[iClient] = GetGameTime()-0.03;
 			time = 3.24; //update time
 		}
 		case TFCond_KnockedIntoAir: //mark target to be hit by FaN
@@ -2973,6 +3013,13 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 					if(time>0.0)
 						return Plugin_Handled;
 				}
+			}
+		}
+		case TFClass_Pyro:
+		{
+			if(condition == TFCond_Taunting && TF2_IsPlayerInCondition(iClient,TFCond_CritMmmph))
+			{
+				RequestFrame(MmmphCheck,iClient); //stop phlog cancelling, add speed boost when over
 			}
 		}
 	}
@@ -3840,6 +3887,20 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 			}
 		}
 
+		//syringe aim punch
+		// if(g_syringeHit[iClient]>0)
+		// {
+		// 	if(g_syringeHit[iClient]==10.0)	angles[0] -= 2.5;
+		// 	else angles[0] += 0.25;
+		// 	TeleportEntity(iClient, NULL_VECTOR, angles, NULL_VECTOR);
+		// 	g_syringeHit[iClient] -= 1;
+		// }
+		// else if(g_syringeHit[iClient]<0)
+		// {
+		// 	g_syringeHit[iClient] = 0.0;
+		// }
+		// PrintToChat(iClient,"%.2f",g_syringeHit[iClient]);
+
 		g_LastButtons[iClient] = buttons;
 		if(!buttonsModified) g_TrueLastButtons[iClient] = buttons;
 	}
@@ -3949,7 +4010,7 @@ public Action VoiceListener(int iClient, const char[] command, int argc)
 				return Plugin_Continue;
 
 			EmitSoundToClient(iClient,classSound,iClient, _, SNDLEVEL_GUNFIRE, _, SNDVOL_NORMAL, _, _);
-			CreateParticle(iClient,"powerup_icon_precision",2.0,_,_,_,_,100.0,_,false,false);
+			// CreateParticle(iClient,"powerup_icon_precision",2.0,_,_,_,_,100.0,_,false,false);
 			SetAnimation(iClient,"gesture_melee_help",2,1);
 			int target = GetClientAimTarget(iClient);
 			if(IsValidClient(target) && !TF2_IsPlayerInCondition(iClient,TFCond_Cloaked)) //highlight sniper aimed at
@@ -3999,7 +4060,6 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 	if(IsValidClient(attacker))
 	{
 		TFClassType tfAttackerClass = TF2_GetPlayerClass(attacker);
-
 		//check for blast jump counters
 		if(g_condFlags[victim] & TF_CONDFLAG_BLJUMP || TF2_IsPlayerInCondition(victim,TFCond_BlastJumping))
 		{
@@ -4716,13 +4776,13 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 							}
 							
 						}
-						//machina charge damage
-						float charge = GetEntPropFloat(weapon, Prop_Send, "m_flChargedDamage");
-						if(charge>50)
-						{
-							charge -= 50;
-							damage *= 1+((charge/100)*(1.0/6));
-						}
+						// //machina charge damage
+						// float charge = GetEntPropFloat(weapon, Prop_Send, "m_flChargedDamage");
+						// if(charge>50)
+						// {
+						// 	charge -= 50;
+						// 	damage *= 1+((charge/100)*(1.0/6));
+						// }
 					}
 					case 402:
 					{
@@ -4843,8 +4903,12 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			case TFClass_Medic:
 			{
 				switch(weaponIndex){
-					case 17,204,36,412:{
-						if(damage>1 && !(damagetype & DMG_BULLET)){
+					case 17,204,36,412:{ //syringe damage
+						if(damage==10.0 && damagetype == DMG_BULLET){
+							damage = 0.1; //ghost hits for flinching
+						}
+						else
+						{
 							int isCrit = 0;
 							Address address = TF2Attrib_GetByDefIndex(weapon,1);
 							damage = 10.0;
@@ -4995,7 +5059,9 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					int primaryIndex = -1;
 					if(primary>0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
 					int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-					if(primaryIndex == 312 && (weaponState == 2 || weaponState == 3))
+					int MaxHP = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iMaxHealth", _, victim);
+					//resistance only kicks in below 90% HP
+					if(GetClientHealth(victim) - damage > MaxHP*0.9 && primaryIndex == 312 && (weaponState == 2 || weaponState == 3))
 						damage *= 0.85;
 				}
 			}
@@ -5079,13 +5145,13 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 			// }
 			case 526, 30665:
 			{
-				//machina charge damage
-				float charge = GetEntPropFloat(weapon, Prop_Send, "m_flChargedDamage");
-				if(charge>50)
-				{
-					charge -= 50;
-					damage *= 1+((charge/100)*(1.0/6));
-				}
+				// //machina charge damage
+				// float charge = GetEntPropFloat(weapon, Prop_Send, "m_flChargedDamage");
+				// if(charge>50)
+				// {
+				// 	charge -= 50;
+				// 	damage *= 1+((charge/100)*(1.0/6));
+				// }
 				//Machina penetrate building
 				int idx, closest = -1;
 				int victim, hit;
@@ -5164,7 +5230,7 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 					int shield = GetEntProp(building, Prop_Send, "m_nShieldLevel");
 					
 					if(shield > 0 && weaponIndex != 460 && weaponIndex != 171)
-						damage *= 1.8; //change to 40% res
+						damage *= (20.0/11.0); //change to 40% res
 				}
 			}
 		}
@@ -6082,6 +6148,17 @@ public void DeadRingCheck(int iClient)
 		SetEntPropFloat(iClient, Prop_Send,"m_flCloakMeter",100.0);
 }
 
+public void MmmphCheck(int iClient)
+{
+	if(TF2_IsPlayerInCondition(iClient,TFCond_CritMmmph))
+	{
+		TF2_AddCondition(iClient,TFCond_SpeedBuffAlly,3.0);
+		TF2_RemoveCondition(iClient,TFCond_UberchargedCanteen);
+		if(TF2Util_GetPlayerConditionProvider(iClient,TFCond_MegaHeal) == -1)
+			TF2_RemoveCondition(iClient,TFCond_MegaHeal);
+	}
+}
+
 public Action MelterView(Handle timer, int view)
 {
 	if(GetEntProp(view, Prop_Send, "m_nSequence") == 24 || GetEntProp(view, Prop_Send, "m_nSequence") == 25)
@@ -6682,6 +6759,24 @@ Action FlagTouch(int flag, int other)
 	return Plugin_Continue;
 }
 
+Action PointTouchStart(int entity, int other)
+{
+	if(IsValidClient(other))
+	{
+		g_condFlags[other] |= TF_CONDFLAG_CAPPING;
+	}
+	return Plugin_Continue;
+}
+
+Action PointTouchEnd(int entity, int other)
+{
+	if(IsValidClient(other))
+	{
+		g_condFlags[other] &= ~TF_CONDFLAG_CAPPING;
+	}
+	return Plugin_Continue;
+}
+
 Action FlameTouch(int flame, int other) //lingering flamethrower flames
 {
 	float time = GetGameTime();
@@ -6927,47 +7022,56 @@ Action needleTouch(int entity, int other)
 	{
 		case 17,204,36,412:
 		{
-			if (other >= 1 && other <= MaxClients)
+			int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+			if(IsValidClient(owner))
 			{
-				int owner = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
 
-				TFTeam team = TF2_GetClientTeam(other);
-				//set teammates crit heals to max with syringes
-				if(other != owner && TF2_GetClientTeam(owner) == team)
+				if (other != owner && other >= 1 && other <= MaxClients)
 				{
-					// int dmg = GetEntProp(iClient, Prop_Data, "m_lastDamageAmount");
-					float dmgTime = GetEntDataFloat(other,8968); //m_flLastDamageTime
-					if(GetGameTime() < dmgTime+15.0)
+					TFTeam team = TF2_GetClientTeam(other);
+					//set teammates crit heals to max with syringes
+					if(TF2_GetClientTeam(owner) == team)
 					{
-						SetEntDataFloat(other,8968,dmgTime-5.0,true); //reduce by 5 seconds on-hit
-						EmitSoundToClient(owner,"weapons/syringegun_reload_air2.wav");
-						EmitSoundToClient(other,"weapons/syringegun_reload_air2.wav");
-						// if(wepIndex==36)
-						// {
-						// 	SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
-						// 	ShowHudText(owner,2,"+3 HP");
-						// 	TF2Util_TakeHealth(owner,3.0);
-						// }
+						// int dmg = GetEntProp(iClient, Prop_Data, "m_lastDamageAmount");
+						float dmgTime = GetEntDataFloat(other,8968); //m_flLastDamageTime
+						if(GetGameTime() < dmgTime+15.0)
+						{
+							SetEntDataFloat(other,8968,dmgTime-5.0,true); //reduce by 5 seconds on-hit
+							EmitSoundToClient(owner,"weapons/syringegun_reload_air2.wav");
+							EmitSoundToClient(other,"weapons/syringegun_reload_air2.wav");
+							// if(wepIndex==36)
+							// {
+							// 	SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
+							// 	ShowHudText(owner,2,"+3 HP");
+							// 	TF2Util_TakeHealth(owner,3.0);
+							// }
+						}
+						else
+						{
+							if(!TF2_IsPlayerInCondition(other,TFCond_Cloaked)&&!TF2_IsPlayerInCondition(other,TFCond_CloakFlicker))
+							{
+								if(team == TFTeam_Blue)
+									CreateParticle(other,"soldierbuff_blue_buffed",1.0,_,_,_,_,_,_,false,false);
+								else if(team == TFTeam_Red)
+									CreateParticle(other,"soldierbuff_red_buffed",1.0,_,_,_,_,_,_,false,false);
+							}
+							EmitSoundToClient(owner,"player/recharged.wav");
+							EmitSoundToClient(other,"player/recharged.wav");
+						}
 					}
 					else
 					{
-						if(!TF2_IsPlayerInCondition(other,TFCond_Cloaked)&&!TF2_IsPlayerInCondition(other,TFCond_CloakFlicker))
-						{
-							if(team == TFTeam_Blue)
-								CreateParticle(other,"soldierbuff_blue_buffed",1.0,_,_,_,_,_,_,false,false);
-							else if(team == TFTeam_Red)
-								CreateParticle(other,"soldierbuff_red_buffed",1.0,_,_,_,_,_,_,false,false);
-						}
-						EmitSoundToClient(owner,"player/recharged.wav");
-						EmitSoundToClient(other,"player/recharged.wav");
+						//syringe aim punch
+						g_syringeHit[other] = 10.0;
+						SDKHooks_TakeDamage(other,owner,owner,10.0,DMG_BULLET,weapon,_,_,false);
 					}
+					return Plugin_Stop;
 				}
-				return Plugin_Stop;
-			}
-			else if (other == 0)
-			{
-				CreateParticle(entity,"impact_metal",1.0,_,_,_,_,_,_,false);
-				// SDKHook(entity, SDKHook_Touch, needleOnTouch);
+				else if (other == 0)
+				{
+					CreateParticle(entity,"impact_metal",1.0,_,_,_,_,_,_,false);
+					// SDKHook(entity, SDKHook_Touch, needleOnTouch);
+				}
 			}
 		}
 	}
