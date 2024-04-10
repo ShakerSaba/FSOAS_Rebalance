@@ -4636,20 +4636,6 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 			}
 		}
 	}
-	if(TF2_IsPlayerInCondition(victim,TFCond_MarkedForDeath))
-	{
-		int prov = TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeath);
-		if(IsValidClient(prov)) //wanga prick
-		{
-			int melee = TF2Util_GetPlayerLoadoutEntity(prov, TFWeaponSlot_Melee, true);
-			int meleeIndex = -1;
-			if(melee != -1) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
-			if(meleeIndex==574)
-			{
-				TF2Util_TakeHealth(prov,damage/2.0);
-			}
-		}
-	}
 
 	if(IsValidClient(attacker))
 	{
@@ -4977,29 +4963,6 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		{
 			case TFClass_Spy:
 			{
-				if(weaponIndex==574) //wanga prick
-				{
-					if(damagecustom==TF_CUSTOM_BACKSTAB)
-					{
-						damage=0.0;
-						for(int idx = 1; idx < MaxClients; idx++)
-						{
-							if(IsClientInGame(idx))
-							{
-								if(IsPlayerAlive(idx) && GetClientTeam(idx) != GetClientTeam(attacker))
-								{
-									float target_pos[3];
-									GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
-									float distance = GetVectorDistance(damagePosition, target_pos);
-									if(distance < 216.0)
-									{
-										TF2_AddCondition(idx,TFCond_MarkedForDeath,5.1,attacker);
-									}
-								}
-							}
-						}
-					}
-				}
 				if(weaponIndex==61 || weaponIndex==1006) //amby headshot
 				{
 					if(damagetype & DMG_SHOCK)
@@ -6009,8 +5972,8 @@ void MeltKnife(int iClient, int melee, float time)
 	TF2_RemoveCondition(iClient,TFCond_Milked);
 	TF2_RemoveCondition(iClient,TFCond_Gas);
 	TF2_RemoveCondition(iClient,TFCond_Bleeding);
-	TF2_RemoveCondition(iClient,TFCond_MarkedForDeath);
-	TF2_RemoveCondition(iClient,TFCond_MarkedForDeathSilent);
+	// TF2_RemoveCondition(iClient,TFCond_MarkedForDeath);
+	// TF2_RemoveCondition(iClient,TFCond_MarkedForDeathSilent);
 	EmitAmbientSound("player/flame_out.wav",position,iClient);
 	SetEntProp(melee, Prop_Send,"m_bKnifeExists",0);
 	SetEntPropFloat(melee, Prop_Send,"m_flKnifeRegenerateDuration",time);
