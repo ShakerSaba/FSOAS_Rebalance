@@ -871,7 +871,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			{
 				TF2Attrib_SetByDefIndex(secondary,2,2.5); //damage bonus
 				TF2Attrib_SetByDefIndex(secondary,6,0.8); //firing speed bonus
-				TF2Attrib_SetByDefIndex(secondary,103,0.5); //projectile speed
+				TF2Attrib_SetByDefIndex(secondary,103,1.5); //projectile speed
 			}
 			//The Enforcer
 			case 460:
