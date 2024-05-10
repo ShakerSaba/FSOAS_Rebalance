@@ -4739,7 +4739,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					if(secondaryIndex == 311 && attacker != victim)
 					{
 						float Charge = GetEntPropFloat(attacker, Prop_Send, "m_flItemChargeMeter", 1);
-						float newCharge = Charge+damage/6.0;
+						float newCharge = Charge+damage/5.0;
 						if(newCharge >= 100.0)
 						{
 							newCharge = 100.0;
@@ -7443,10 +7443,10 @@ void flareSpawn(int entity)
 		weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
 		int wepIndex = -1;
 		if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-		if (740 == wepIndex)
+		if (740 == wepIndex) //scorch doesn't bounce yet
 		{
 			SetEntProp(entity, Prop_Data, "m_iHealth",1);
-			CreateTimer(0.105,flareActivate,entity);
+			CreateTimer(0.075,flareActivate,entity);
 		}
 	}
 }
@@ -7456,7 +7456,7 @@ Action flareActivate(Handle timer,int flare)
 	char class[64];
 	GetEntityClassname(flare, class, sizeof(class));
 	if(IsValidEdict(flare) && StrEqual(class, "tf_projectile_flare"))
-		SetEntProp(flare, Prop_Data, "m_iHealth",0);
+		SetEntProp(flare, Prop_Data, "m_iHealth",0); //scorch bounces now
 	
 	return Plugin_Continue;
 }
