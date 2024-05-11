@@ -7443,23 +7443,23 @@ void flareSpawn(int entity)
 		weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
 		int wepIndex = -1;
 		if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-		if (740 == wepIndex) //scorch doesn't bounce yet
+		if (740 == wepIndex) //scorch bounce set
 		{
-			SetEntProp(entity, Prop_Data, "m_iHealth",1);
-			CreateTimer(0.075,flareActivate,entity);
+			SetEntProp(entity, Prop_Data, "m_iHealth",0);
+			// CreateTimer(0.075,flareActivate,entity);
 		}
 	}
 }
 
-Action flareActivate(Handle timer,int flare)
-{
-	char class[64];
-	GetEntityClassname(flare, class, sizeof(class));
-	if(IsValidEdict(flare) && StrEqual(class, "tf_projectile_flare"))
-		SetEntProp(flare, Prop_Data, "m_iHealth",0); //scorch bounces now
+// Action flareActivate(Handle timer,int flare)
+// {
+// 	char class[64];
+// 	GetEntityClassname(flare, class, sizeof(class));
+// 	if(IsValidEdict(flare) && StrEqual(class, "tf_projectile_flare"))
+// 		SetEntProp(flare, Prop_Data, "m_iHealth",0); //scorch bounces now
 	
-	return Plugin_Continue;
-}
+// 	return Plugin_Continue;
+// }
 
 public void Syringe_PrimaryAttack(int iClient,int primary,float angles[3],int index)
 {
