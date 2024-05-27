@@ -685,7 +685,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				{
 					g_meterPri[iClient]=0.0;
 				}
-				SetEntPropFloat(primary, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
+				SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
 			}
 			//Liberty Launcher
 			case 414:
@@ -861,7 +861,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				{
 					g_meterPri[iClient]=0.0;
 				}
-				SetEntPropFloat(primary, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
+				SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
 			}
 		}
 
@@ -4828,7 +4828,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 							int current = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
 							if(damagetype & DMG_BURN)
 								g_meterMel[attacker] += 1.0; //afterburn ticks count as 1%
-							else if(current == melee)
+							else if(current == melee && damagetype & DMG_CLUB)
 								g_meterMel[attacker] += damage; //otherwise only use active adamge
 						}
 					}
