@@ -4384,7 +4384,7 @@ public Action VoiceListener(int iClient, const char[] command, int argc)
 	char[] args = new char[64];
 	GetCmdArgString(args,64);
 	
-	if(GetGameTime() - g_lastVoice[iClient] > 3.0)
+	if(GetGameTime() - g_lastVoice[iClient] > 3.0 && IsPlayerAlive(iClient))
 	{
 		if(StrEqual(args, "1 8") || StrEqual(args, "0 8") || StrEqual(command,"sm_sniper")) //replaces "Pass To Me!" with "Sniper Ahead!"
 		{
@@ -5582,16 +5582,13 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		//check for blast jump counters
 		if((g_condFlags[victim] & TF_CONDFLAG_BLJUMP || TF2_IsPlayerInCondition(victim,TFCond_BlastJumping)) && (victim != attacker) && (victim != inflictor))
 		{
-			int primary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Primary, true);
-			int primaryIndex = -1;
-			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-			if(damagetype & DMG_BLAST && (primaryIndex == 127 || primaryIndex == 308))
+			if(damagetype & DMG_BLAST && (weaponIndex == 127 || weaponIndex == 308))
 			{
 				if(!(damagetype & DMG_CRIT))
 				{
 					damagetype |= DMG_CRIT;
-					if(primaryIndex == 308) damage *= 1.35;
-					else if(primaryIndex == 127)
+					if(weaponIndex == 308) damage *= 1.35;
+					else if(weaponIndex == 127)
 					{
 						float dist = getPlayerDistance(attacker,victim);
 						damage = 112.5;
