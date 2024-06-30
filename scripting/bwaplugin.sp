@@ -69,9 +69,9 @@ float HOVER_TIME = 0.03;
 float PARACHUTE_TIME = 6.0;
 float FIRE_TIME = 3.0;
 float HAND_MAX = 10.0;
-// float SODA_DAMAGE = 10.0;
 float PRESSURE_TIME = 5.0;
 float PRESSURE_FORCE = 2.75;
+float HYPE_COST = 24.0;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
 #define TF_CONDFLAG_VACCMAX      	(1 << 2)
@@ -155,6 +155,7 @@ public void OnPluginStart()
 
 	AddCommandListener(PlayerListener,"taunt");
 	AddCommandListener(PlayerListener,"+taunt");
+	AddCommandListener(PlayerListener,"eureka_teleport");
 	AddCommandListener(VoiceListener, "voicemenu");
 	AddCommandListener(VoiceListener, "sm_sniper");
 
@@ -197,6 +198,44 @@ public void OnPluginStart()
 	AddFileToDownloadsTable("sound/vo/demoman_mvm_sniper01.wav");
 	AddFileToDownloadsTable("sound/vo/sniper_mvm_sniper01.wav");
 	AddFileToDownloadsTable("sound/vo/spy_mvm_sniper01.wav");
+	
+	CreateTimer(0.5, HookSpawns, 0);
+}
+public void Round_Start(Handle event, const char[] name, bool dontBroadcast) {
+    CreateTimer(0.5, HookSpawns, 0); //this one too
+}
+Action HookSpawns(Handle Timer,int dummy){
+	int ent = -1;
+	while ((ent = FindEntityByClassname(ent, "func_respawnroom")) != -1) {
+		SDKUnhook(ent, SDKHook_Touch, SpawnTouch);
+		SDKUnhook(ent, SDKHook_EndTouchPost, SpawnEndTouch);
+		SDKHook(ent, SDKHook_Touch, SpawnTouch);
+		SDKHook(ent, SDKHook_EndTouchPost, SpawnEndTouch);
+	}
+	return Plugin_Continue;
+}
+Action SpawnTouch(int spawn, int client) {
+	if (client > MaxClients || client < 1) {
+		return Plugin_Continue;
+	}
+	if (!IsClientInGame(client)) {
+		return Plugin_Continue;
+	}
+	if (GetEntProp(spawn, Prop_Send, "m_iTeamNum") == GetClientTeam(client)) {
+		g_condFlags[client]|=TF_CONDFLAG_INSPAWN;
+	}
+	return Plugin_Continue;
+}
+void SpawnEndTouch(int spawn, int client) {
+	if (client > MaxClients || client < 1) {
+		return;
+	}
+	if (!IsClientInGame(client)) {
+		return;
+	}
+	if (GetEntProp(spawn, Prop_Send, "m_iTeamNum") == GetClientTeam(client)) {
+		g_condFlags[client]&=~TF_CONDFLAG_INSPAWN;
+	}
 }
 
 public void OnClientPutInServer (int iClient)
@@ -574,7 +613,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case TFClass_Pyro: 
 			{
 				//modify pyro airblast
-				if(primaryIndex!=594 && primaryIndex!=1178) //ignore DF and phlog
+				if(primaryIndex!=594) //ignore DF and phlog
 				{
 					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
 					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 10);
@@ -843,6 +882,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 40,1146:
 			{
 				// TF2Attrib_SetByDefIndex(primary,170,2.0); //airblast cost increased
+				TF2Attrib_SetByDefIndex(primary,255,1.33); //airblast force
 			}
 			//Iron Bomber
 			case 1151:
@@ -873,11 +913,16 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Soda Popper
 			case 448:
 			{
-				if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
-				{
-					g_meterPri[iClient]=0.0;
-				}
-				SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
+				// if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
+				// {
+				// 	g_meterPri[iClient]=0.0;
+				// }
+				// SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
+			}
+			//Phlog
+			case 1178:
+			{
+				g_meterPri[iClient]=100.0;
 			}
 		}
 
@@ -1061,6 +1106,11 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 131,1144:
 			{
 				TF2Attrib_SetByDefIndex(secondary,252,0.67); //damage force reduction
+			}
+			//Flying Guillotine
+			case 812,833:
+			{
+				TF2Attrib_SetByDefIndex(secondary,278,1.6); //mult_item_meter_charge_rate
 			}
 		}
 
@@ -1431,6 +1481,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			}
 			case 60: //cloak and dagger
 			{
+				TF2Attrib_SetByDefIndex(watch,83,0.825); //cloak consume rate decreased
 				TF2Attrib_SetByDefIndex(watch,253,-0.35); //mult cloak rate
 			}
 		}
@@ -1531,7 +1582,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			g_meterMel[iClient] = 0.0;
 		if(secondaryIndex != 311)
 			g_meterSec[iClient] = 0.0;
-		if(primaryIndex != 811 && primaryIndex != 832 && primaryIndex != 772 && primaryIndex != 448)
+		if(primaryIndex != 811 && primaryIndex != 832 && primaryIndex != 772 && primaryIndex != 1178)
 			g_meterPri[iClient] = 0.0;
 		g_lastFire[iClient] = 0.0;
 		g_meleeStart[iClient] = 0.0;
@@ -2265,18 +2316,17 @@ public void OnGameFrame()
 						{
 							float hype = GetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter");
 							// air jumps
-							float vel[3];
-							GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
-							float jumping = vel[2];//GetEntProp(iClient, Prop_Send,"m_bJumping");
+							// float vel[3];
+							// GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
+							// int jumping = GetEntProp(iClient, Prop_Send,"m_bJumping");
 							int jumps = GetEntProp(iClient, Prop_Send,"m_iAirDash");
-							if(jumping!=0.0)
+							if(!(clientFlags & FL_ONGROUND))
 							{
-								if(hype>=19.7){
+								if(hype>=HYPE_COST){
 									if(jumps==1)
 									{
 										SetEntProp(iClient, Prop_Send,"m_iAirDash",0);
-										hype-=19.7;
-										g_meterPri[iClient]=hype;
+										hype-=HYPE_COST;
 										SetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter",hype);
 										float pos[3];
 										GetClientEyePosition(iClient,pos);
@@ -2288,21 +2338,15 @@ public void OnGameFrame()
 									if(jumps==0) SetEntProp(iClient, Prop_Send,"m_iAirDash",1);
 								}
 							}
-							if(hype>=19.7 && !TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
+							if(hype>=HYPE_COST && !TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
 							{
 								TF2_AddCondition(iClient,TFCond_CritHype);
 							}
 							else if(TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
 							{
-								if(hype<99.9) SetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter",g_meterPri[iClient]+9.33/66);
-								if(hype<19.7 && TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
+								if(hype<99.9) SetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter",hype+0.1415);
+								if(hype<HYPE_COST)
 									TF2_RemoveCondition(iClient,TFCond_CritHype);
-							}
-							
-							//adjust hype
-							if(RoundFloat(g_meterPri[iClient])>RoundFloat(hype))
-							{
-								g_meterPri[iClient]=hype;
 							}
 						}
 						//manage baby face
@@ -2318,9 +2362,28 @@ public void OnGameFrame()
 					}
 					switch(secondaryIndex)
 					{
-						case 222,1121:
+						case 222,1121: //mad milk
 						{
 							g_meterSec[iClient] += 0.015; //marker for meter in case of switch
+						}
+						case 812,833: //flying guillotine
+						{
+							float time = GetGameTime();
+							float regen = GetEntPropFloat(secondary,Prop_Send,"m_flEffectBarRegenTime");
+							float last = GetEntPropFloat(secondary,Prop_Send,"m_flLastFireTime");
+							if(regen!=g_meterSec[iClient])
+							{
+								if(regen>g_meterSec[iClient]) g_meterSec[iClient] = regen;
+								if(regen<g_meterSec[iClient])
+								{
+									SetEntPropFloat(secondary,Prop_Send,"m_flEffectBarRegenTime",g_meterSec[iClient]);
+									SetEntPropFloat(secondary,Prop_Send,"m_flLastFireTime",g_meterSec[iClient]-8.0);
+								}
+							}
+							if(time-last > 0.5 && time < regen && !(g_condFlags[iClient] & TF_CONDFLAG_BASED))
+								g_condFlags[iClient] |= TF_CONDFLAG_BASED;
+							if(time > regen && g_condFlags[iClient] & TF_CONDFLAG_BASED)
+								g_condFlags[iClient] &= ~TF_CONDFLAG_BASED;
 						}
 					}
 				}
@@ -2344,17 +2407,30 @@ public void OnGameFrame()
 					if(primaryIndex != 594 && primaryIndex !=1 && primary!=-1) //handle airblast, except for dragon's fury and phlog
 					{
 						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
+						if(primaryIndex == 1178) meter = g_meterPri[iClient];
 						// float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
-						float nextAttack = g_meterPri[iClient];
+						float nextAttack = GetEntPropFloat(primary, Prop_Send, "m_flLastFireTime");
 						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-						if(weaponState!=3 && primaryIndex != 1178 && nextAttack-0.15<GetGameTime()) //out of airblast
+						// float lastTime = GetEntPropFloat(melee, Prop_Send, "m_flLastFireTime");
+						if(weaponState!=3 && nextAttack-0.15<GetGameTime()) //out of airblast
 						{
 							//update pressure meter
-							if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+100.0/(66*PRESSURE_TIME), 0);
-							else if(meter>100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
+							float increment = 100.0/(66*PRESSURE_TIME);
+							if(primaryIndex==40 || primaryIndex==1146) increment *= 0.67; //backburner slower recharge
+							if(primaryIndex == 1178)
+							{
+								if(meter<100.0) g_meterPri[iClient] = meter+increment;
+								else if(meter>100.0) g_meterPri[iClient] = 100.0;
+							}
+							else
+							{
+								if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+increment, 0);
+								else if(meter>100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
+							}
 							//update force of airblast in increments
 							int force = RoundToNearest(meter);
 							float newMeter = 0.5+meter/200;
+							if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.33;
 							if(force % 5 == 0) TF2Attrib_SetByDefIndex(primary,255,newMeter);
 						}
 						SetHudTextParams(-0.1, -0.16, 0.5, 255, 255, 255, 255);
@@ -2380,6 +2456,47 @@ public void OnGameFrame()
 									SetEntProp(view, Prop_Send, "m_nSequence",24);
 									SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.0);
 								}
+							}
+						}
+						//thruster
+						case 1179:
+						{
+							//track airtime and ground ticks
+							if(!(g_condFlags[iClient] & TF_CONDFLAG_HOVER))
+							{
+								float vel[3];
+								GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
+								if(vel[2]!=0.0 || !(clientFlags & FL_ONGROUND))
+								{
+									if(g_meterSec[iClient]<0.0)
+										g_meterSec[iClient] = 0.0;
+									g_meterSec[iClient]+=0.015;
+								}
+								else
+								{
+									if(g_meterSec[iClient]>0.0)
+										g_meterSec[iClient] = 0.0;
+									g_meterSec[iClient]-=0.015;
+								}
+							}
+							//generate particle
+							if(g_meterSec[iClient]<-1.995 && GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1) > 50)
+							{
+								float angles[3];
+								GetClientEyeAngles(iClient,angles);
+								float exAngle = 0.0;
+								angles[0] *= 1.25; angles[1] *= 1.25; 
+								if(angles[0]!=0)
+								{
+									if(angles[1]!=0) exAngle = angles[1] > 0 ? 45.0 : 135.0;
+									else exAngle = 90.0;
+									if(angles[0]<0) exAngle *= -1;
+								}
+								else exAngle = angles[1] < 0 ? 180.0 : 0.0;
+								if(!(angles[0]!=0 || angles[1]!=0)) exAngle += angles[1];
+								else exAngle += angles[1] - 90;
+								CreateParticle(iClient,"rocketpack_exhaust",0.03,0.0,exAngle,_,_,42.0,_,_,_,_,_,_);
+								g_meterSec[iClient]=0.0;
 							}
 						}
 					}
@@ -2642,6 +2759,19 @@ public void OnGameFrame()
 							{
 								g_meterMel[iClient] += 0.015;
 							}
+						}
+					}
+					switch(meleeIndex)
+					{
+						case 589: //Eureka
+						{
+							// float first = GetEntPropFloat(melee, Prop_Send,"m_flNextPrimaryAttack",0);
+							// float secon = GetEntPropFloat(melee, Prop_Send,"m_flNextSecondaryAttack",0);
+							// float last = GetEntPropFloat(melee, Prop_Send,"m_flLastFireTime",0);
+							// int taunt = GetEntProp(melee, Prop_Send,"m_bBeingRepurposedForTaunt",0);
+							// int conds = GetEntProp(iClient, Prop_Send,"m_nPlayerCond",0);
+							// int states = GetEntProp(iClient, Prop_Send,"m_nPlayerState",0);
+							// PrintToChat(iClient,"%d %d",states,conds);
 						}
 					}
 				}
@@ -3049,14 +3179,14 @@ public void OnGameFrame()
 					int maxHealth = GetEntProp(building, Prop_Send, "m_iMaxHealth");
 					switch(rate)
 					{
-						case 0.50: { rate = 1.0; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 1.00);  } //not boosted
-						case 1.25: { rate = 2.5; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 2.50);  } //wrench boost
-						case 1.47: { rate = 2.94; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 2.94); } //jag boost
-						case 0.87: { rate = 1.74; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 1.74); } //EE boost
-						case 2.00: { rate = 4.0; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 4.00);  } //redeploy no boost
-						case 2.75: { rate = 5.5; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 5.50);  } //redeploy boosted
+						case 0.50: { rate = 0.9; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 0.9);  } //not boosted
+						case 1.25: { rate = 2.25; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 2.25);  } //wrench boost
+						case 1.47: { rate = 2.65; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 2.65); } //jag boost
+						case 0.87: { rate = 1.57; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 1.57); } //EE boost
+						case 2.00: { rate = 3.60; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 3.60);  } //redeploy no boost
+						case 2.75: { rate = 4.95; SetEntPropFloat(building, Prop_Send, "m_flPlaybackRate", 4.95);  } //redeploy boosted
 					}
-					if(rate!=4.0 || rate!=5.5) //if not redeployed
+					if(rate!=3.60 || rate!=4.95) //if not redeployed
 					{
 						if(GetEntProp(building, Prop_Send, "m_iHealth")<RoundFloat(g_buildingHeal[building]))
 						{
@@ -3064,14 +3194,14 @@ public void OnGameFrame()
 							AcceptEntityInput(building,"AddHealth");
 						}
 					}
-					SetEntPropFloat(building, Prop_Send, "m_flPercentageConstructed",cycle*1.95 > 1.0 ? 1.0 : cycle*1.95);
+					SetEntPropFloat(building, Prop_Send, "m_flPercentageConstructed",cycle*1.70 > 1.0 ? 1.0 : cycle*1.70);
 					if(cons>=1.00)
 					{
-						if(rate!=4.0 || rate!=5.5) SetEntProp(building, Prop_Send, "m_iHealth", maxHealth);
+						if(rate!=3.60 || rate!=4.95) SetEntProp(building, Prop_Send, "m_iHealth", maxHealth);
 						SDKCall(g_hSDKFinishBuilding, building);
 						RequestFrame(healBuild,building);
 					}
-					g_buildingHeal[building]+=rate/4.5;
+					g_buildingHeal[building]+=rate/4.75;
 				}
 			}
 		}
@@ -3164,12 +3294,15 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 	{
 		case TFCond_OnFire,TFCond_BurningPyro: //healing debuff on ALL afterburn
 		{
-			DataPack pack = new DataPack();
-			pack.Reset();
-			pack.WriteCell(iClient);
-			pack.WriteCell(provider);
-			pack.WriteFloat(time);
-			CreateTimer(0.03,FireDebuff,pack);
+			if(provider != iClient)
+			{
+				DataPack pack = new DataPack();
+				pack.Reset();
+				pack.WriteCell(iClient);
+				pack.WriteCell(provider);
+				pack.WriteFloat(time);
+				CreateTimer(0.03,FireDebuff,pack);
+			}
 		}
 		case TFCond_FocusBuff: //reset Heatmaker tracer
 		{
@@ -3295,14 +3428,6 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 				g_condFlags[iClient] &= ~TF_CONDFLAG_VOLCANO;
 			//healing debuff on ALL afterburn
 			TF2Util_SetPlayerConditionDuration(iClient,TFCond_HealingDebuff,0.0);
-			//ALWAYS
-			if(g_condFlags[iClient] & TF_CONDFLAG_ALWAYS)
-			{
-				SetCommandFlags("r_screenoverlay", GetCommandFlags("r_screenoverlay") & ~FCVAR_CHEAT);
-				ClientCommand(iClient, "r_screenoverlay \"\"");
-				SetCommandFlags("r_screenoverlay", GetCommandFlags("r_screenoverlay") | FCVAR_CHEAT);
-				g_condFlags[iClient] &= ~TF_CONDFLAG_ALWAYS;
-			}
 		}
 		case TFCond_FocusBuff: //reset Heatmaker tracer
 		{
@@ -3324,7 +3449,7 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 		case TFCond_CritHype: //block Soda hype
 		{
 			float hype = GetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter");
-			if(hype>=19.7)
+			if(hype>=HYPE_COST)
 			{
 				return Plugin_Handled;
 			}
@@ -3581,31 +3706,30 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					else //other airblast alt-fire
 					{
 						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
+						if(primaryIndex == 1178) meter = g_meterPri[iClient];
 						float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
 						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
 						if(weaponState==3) //in-airblast
 						{
-							if((primaryIndex != 1178 && meter2 < meter) || (primaryIndex == 1178 && meter == 0.0)) //done to make limit it to first frame in this state
+							if(meter2 < meter) //done to make limit it to first frame in this state
 							{
 								// float vel[3];
 								// GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
 								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
 								{
-									if(!(primaryIndex == 1178 && meter!=0.0))
-									{
-										AirblastPush(iClient);
-									}
+									AirblastPush(iClient);
 								}
-								if(primaryIndex != 1178)
-								{
-									g_meterPri[iClient] = GetGameTime()+0.75;
-									meter=0.0;
-									if(meter<0.0) meter = 0.0;
-									//update pressure meter
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
-									TF2Attrib_SetByDefIndex(primary,255,0.5+meter/200); //set next airblast force
-								}
+								
+								SetEntPropFloat(primary, Prop_Send, "m_flLastFireTime",GetGameTime()+0.75);
+								meter=0.0;
+								if(meter<0.0) meter = 0.0;
+								//update pressure meter
+								if(primaryIndex == 1178) g_meterPri[iClient] = meter;
+								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
+								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
+								float newMeter = 0.5+meter/200;
+								if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.33;
+								TF2Attrib_SetByDefIndex(primary,255,newMeter); //set next airblast force
 							}
 						}
 					}
@@ -3620,13 +3744,6 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				//thruster
 				if(1179 == secondaryIndex)
 				{
-					if(!(g_condFlags[iClient] & TF_CONDFLAG_HOVER))
-					{
-						if(currVel[2]!=0.0 || !(clientFlags & FL_ONGROUND))
-							g_meterSec[iClient]+=0.015;
-						else if(g_meterSec[iClient]!=0.0)
-							g_meterSec[iClient] = 0.0;
-					}
 					bool rocketing = GetEntPropFloat(secondary, Prop_Send, "m_flLaunchTime") != 0.0 || TF2_IsPlayerInCondition(iClient,TFCond_RocketPack) || TF2_IsPlayerInCondition(iClient,TFCond_Parachute) || TF2_IsPlayerInCondition(iClient,TFCond_ParachuteDeployed);
 					if((currVel[2]!=0.0 || !(clientFlags & FL_ONGROUND)) && !rocketing && GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1) > 50)
 					{
@@ -3778,40 +3895,6 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					if((charge<75 && charge>40) || (charge<75 && secondaryIndex==1099))
 						TF2_AddCondition(iClient,TFCond_CritCola,0.6);
 				}
-				// switch(meleeIndex)
-				// {
-				// 	//eyelander: use heads for boost
-				// 	case 132,266,482,1082:
-				// 	{
-				// 		// if(curr==melee)
-				// 		// {
-				// 		int heads = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
-				// 		if(heads>6)
-				// 		{
-				// 			heads = 6;
-				// 			SetEntProp(iClient, Prop_Send, "m_iDecapitations", heads);
-				// 		}
-				// 		if(heads > 0 && (buttons & IN_ATTACK3 == IN_ATTACK3) && !(g_LastButtons[iClient] & IN_ATTACK3 == IN_ATTACK3))
-				// 		{
-				// 			TF2_AddCondition(iClient,TFCond_SpeedBuffAlly,3.0);
-				// 			EmitAmbientSound("vo/sword_hit08.mp3",position,iClient,SNDLEVEL_SCREAMING,SND_CHANGEVOL,3.0);
-				// 			TFTeam team = TF2_GetClientTeam(iClient);
-				// 			if(team == TFTeam_Blue)
-				// 				CreateParticle(iClient,"soldierbuff_blue_buffed",1.0,_,_,_,_,_,_,false,false);
-				// 			else if(team == TFTeam_Red)
-				// 				CreateParticle(iClient,"soldierbuff_red_buffed",1.0,_,_,_,_,_,_,false,false);
-				// 			heads = heads-1;
-				// 			SetEntProp(iClient, Prop_Send, "m_iDecapitations", heads);
-				// 			DataPack pack = new DataPack();
-				// 			pack.Reset();
-				// 			pack.WriteCell(iClient);
-				// 			pack.WriteCell(heads);
-				// 			pack.WriteCell(0);
-				// 			RequestFrame(updateHeads,pack);
-				// 		}
-				// 		// }
-				// 	}
-				// }
 			}
 			case TFClass_Medic:
 			{
@@ -4224,6 +4307,13 @@ public Action PlayerListener(int iClient, const char[] command, int argc)
 			(StrEqual(current,"tf_weapon_charged_smg") || StrEqual(current,"tf_weapon_smg") || StrEqual(current,"SMG") || StrEqual(current,"Charged SMG")))
 				CreateTimer(1.875,SMGTauntkill,iClient); //start timer for smg taunt kill
 		}
+		case TFClass_Engineer:
+		{
+			if(StrEqual(command,"eureka_teleport") && StrEqual(args,"0"))
+			{
+				CreateTimer(2.25,TeleportResup,iClient); //triggered on Eureka Effect teleport
+			}
+		}
 		case TFClass_Spy:
 		{
 			if(!TF2_IsPlayerInCondition(iClient,TFCond_Disguised)&&!(g_condFlags[iClient]&TF_CONDFLAG_SPYTAUNT))
@@ -4535,6 +4625,18 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 
 		switch(tfAttackerClass)
 		{
+			case TFClass_Scout:
+			{
+				int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+				int secondaryIndex = -1;
+				if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+				if((secondaryIndex==833 || secondaryIndex==812) && inflictor == secondary) //guillotine long dist minicrit
+				{
+					if(g_condFlags[attacker] & TF_CONDFLAG_BASED)
+						TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
+					g_condFlags[attacker] &= ~TF_CONDFLAG_BASED;
+				}
+			}
 			case TFClass_Spy:
 			{
 				if(damagetype & DMG_BULLET)
@@ -4903,7 +5005,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 						float hype = GetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter");
 						if(RoundFloat(g_meterPri[attacker])<RoundFloat(hype))
 						{
-							g_meterPri[attacker]+=damage/1.25;
+							g_meterPri[attacker]+=damage/2.0;
 							if(g_meterPri[attacker]>100) g_meterPri[attacker]=99.9;
 							SetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter",g_meterPri[attacker]);
 						}
@@ -4912,11 +5014,17 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					{
 						//soda popper hype on hit
 						float hype = GetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter");
-						if(RoundFloat(g_meterPri[attacker])<RoundFloat(hype)||TF2_IsPlayerInCondition(attacker,TFCond_CritHype))
+						if(hype>HYPE_COST&&TF2_IsPlayerInCondition(attacker,TFCond_CritHype))
 						{
-							g_meterPri[attacker]+=damage/4.0;
-							if(g_meterPri[attacker]>100) g_meterPri[attacker]=99.9;
-							SetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter",g_meterPri[attacker]);
+							hype+=damage/3.0;
+							if(hype>100) hype=99.9;
+							SetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter",hype);
+						}
+						else
+						{
+							hype+=damage/25.0;
+							if(hype>100) hype=99.9;
+							SetEntPropFloat(attacker,Prop_Send,"m_flHypeMeter",hype);
 						}
 					}
 				}
@@ -5011,7 +5119,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					float force[3];
 					force[0]=(position[0]-damagePosition[0])*20; force[1]=(position[1]-damagePosition[1])*20; force[2]=(position[2]-damagePosition[2])*10;
 					TeleportEntity(victim,NULL_VECTOR,NULL_VECTOR,force);
-					TF2_AddCondition(victim,TFCond_MegaHeal,0.015,attacker);
+					TF2_AddCondition(victim,TFCond_ImmuneToPushback,0.015,attacker);
 					RequestFrame(CannonKnockback,victim);
 				}
 			}
@@ -5212,7 +5320,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					if(weaponIndex==594)  //check Phlog damage
 					{
 						float temp = g_temperature[victim]-0.5;
-						damage *= temp>0.5 ? 2.0 : 1.35 + 0.65*(temp/0.5);
+						damage *= temp>0.5 ? 3.0 : 1.35 + 1.65*(temp/0.5);
 					}
 					else
 						damage *= 3.0;
@@ -5442,7 +5550,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						if(!(damagetype&DMG_HALF_FALLOFF) && !(damagetype&DMG_BURN) && victim != attacker)
 						{
 							TF2_RemoveCondition(victim,TFCond_Dazed); //negate stun on scorch shot
-							TF2_AddCondition(victim,TFCond_MegaHeal,0.015,attacker); //negate knockback of scorch shot
+							TF2_AddCondition(victim,TFCond_ImmuneToPushback,0.015,attacker); //negate knockback of scorch shot
 						}
 					}
 					case 595: //manmelter giving crits
@@ -7239,6 +7347,43 @@ public Action SMGTauntkill(Handle timer, int client)
 	return Plugin_Continue;
 }
 
+public Action TeleportResup(Handle timer, int iClient)
+{
+	if(IsValidClient(iClient))
+	{
+		if(IsPlayerAlive(iClient) && g_condFlags[iClient]&TF_CONDFLAG_INSPAWN)
+		{
+			int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
+			TF2_RespawnPlayer(iClient);
+			DataPack pack = new DataPack();
+			pack.Reset();
+			pack.WriteCell(iClient);
+			pack.WriteCell(crits);
+			CreateTimer(0.075,GiveCrits,pack);
+		}
+	}
+	return Plugin_Continue;					
+}
+public Action GiveCrits(Handle timer, DataPack pack)
+{
+	pack.Reset();
+	int iClient = pack.ReadCell();
+	int crits = pack.ReadCell();
+	if(IsValidClient(iClient))
+	{
+		if(IsPlayerAlive(iClient) && g_condFlags[iClient]&TF_CONDFLAG_INSPAWN)
+		{
+			SetEntProp(iClient, Prop_Send, "m_iRevengeCrits", crits);
+			if(crits>0)
+			{
+				int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
+				SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon",melee);
+			}
+		}
+	}
+	return Plugin_Continue;		
+}
+
 public void NeonExplosion(DataPack pack)
 {
 	pack.Reset();
@@ -7573,7 +7718,7 @@ Action FlameTouch(int flame, int other) //lingering flamethrower flames
 	char class[64];
 	GetEntityClassname(other, class, sizeof(class));
 	
-	if(g_lastFire[owner]+0.045<time && primaryIndex!=215)
+	if(g_lastFire[owner]+0.06<time && primaryIndex!=215)
 	{
 		if(other==0 || StrEqual(class,"func_brush"))
 		{
@@ -7625,10 +7770,9 @@ Action FlameTouch(int flame, int other) //lingering flamethrower flames
 
 void laserSpawn(int iEnt)
 {
-	char class[64];
+	char class[64],class2[64];
 	int weapon;
-	float maxs[3];
-	float mins[3];
+	float maxs[3],mins[3];
 	GetEntityClassname(iEnt, class, sizeof(class));
 	if (StrEqual(class, "tf_projectile_energy_ring"))
 	{
@@ -7636,15 +7780,17 @@ void laserSpawn(int iEnt)
 		weapon = GetEntPropEnt(iEnt, Prop_Send, "m_hLauncher");
 		if (weapon > 0)
 		{
-			GetEntityClassname(weapon, class, sizeof(class));
-			if (StrEqual(class, "tf_weapon_drg_pomson"))
-				SetEntProp(iEnt, Prop_Send, "m_triggerBloat", 4);
-			else if (StrEqual(class, "tf_weapon_raygun"))
+			GetEntityClassname(weapon, class2, sizeof(class2));
+			// if (StrEqual(class, "tf_weapon_drg_pomson"))
+			// 	SetEntProp(iEnt, Prop_Send, "m_triggerBloat", 4);
+			if (StrEqual(class, "tf_weapon_raygun")||StrEqual(class, "tf_weapon_drg_pomson"))
+			{
 				SetEntProp(iEnt, Prop_Send, "m_triggerBloat", 8);
-			maxs[0] = 2.0; maxs[1] = 2.0; maxs[2] = 10.0;
-			mins[0] = (0.0 - maxs[0]); mins[1] = (0.0 - maxs[1]); mins[2] = (0.0 - maxs[2]);
-			SetEntPropVector(iEnt, Prop_Send, "m_vecMaxs", maxs);
-			SetEntPropVector(iEnt, Prop_Send, "m_vecMins", mins);
+				maxs[0] = 2.0; maxs[1] = 2.0; maxs[2] = 10.0;
+				mins[0] = (0.0 - maxs[0]); mins[1] = (0.0 - maxs[1]); mins[2] = (0.0 - maxs[2]);
+				SetEntPropVector(iEnt, Prop_Send, "m_vecMaxs", maxs);
+				SetEntPropVector(iEnt, Prop_Send, "m_vecMins", mins);
+			}
 			SetEntProp(iEnt, Prop_Send, "m_usSolidFlags", (GetEntProp(iEnt, Prop_Send, "m_usSolidFlags") | 0x80));
 			if (StrEqual(class, "tf_weapon_drg_pomson"))
 			{
@@ -8054,11 +8200,7 @@ void AirblastPush(int client)
 	int primaryIndex = -1;
 	if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
 	float meter = GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", 0);
-	if (primaryIndex==1178)
-	{
-		SetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", 0.1, 0);
-		meter = 100.0;
-	}
+	if(primaryIndex == 1178) meter = g_meterPri[client];
 	meter *= PRESSURE_FORCE;
 	if (primaryIndex==40||primaryIndex==1146)
 	{
@@ -8467,9 +8609,9 @@ public bool CanClientReceiveClassAttributes(int iClient)
 	return true;
 }
 
-stock bool IsHalloweenMap(const char[] mapname)
+stock bool IsHalloweenMap(const char[] mapName)
 {
-	int mapIndex = FindStringInArray(g_Maplist, mapname);
+	int mapIndex = FindStringInArray(g_Maplist, mapName);
 	return (mapIndex > -1);
 }
 
