@@ -1,2 +1,6 @@
 scripting/bwaplugin+wrang.sp
+scripting/bwaplugin_premvm.sp
+plugins/autobalancer.smx
+plugins/automessager.smx
+plugins/sm_chaosmvm.smx
 .vscode/settings.json
