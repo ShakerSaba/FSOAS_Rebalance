@@ -1,5 +1,6 @@
 scripting/bwaplugin+wrang.sp
 scripting/bwaplugin_premvm.sp
+scripting/sm_chaosmvm.sp
 plugins/autobalancer.smx
 plugins/automessager.smx
 plugins/sm_chaosmvm.smx
