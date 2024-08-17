@@ -4994,7 +4994,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				{
 					case 444: //mantreads DIVE
 					{
-						if ((buttons & IN_JUMP == IN_JUMP) && !(g_LastButtons[iClient] & IN_JUMP == IN_JUMP) && g_meterSec[iClient]>0.25 && currVel[2]>-600)
+						if ((buttons & IN_JUMP == IN_JUMP) && !(g_LastButtons[iClient] & IN_JUMP == IN_JUMP) && g_meterSec[iClient]>0.25 && currVel[2]>-500)
 						{
 							// currVel[0] = 0.0;
 							// currVel[1] = 0.0;
@@ -6801,20 +6801,16 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		{
 			if((g_condFlags[victim] & TF_CONDFLAG_BLJUMP || TF2_IsPlayerInCondition(victim,TFCond_BlastJumping)) && (victim != attacker) && (victim != inflictor))
 			{
-				if(damagetype & DMG_BLAST && (weaponIndex == 127 || weaponIndex == 308))
+				if(damagetype & DMG_BLAST && (weaponIndex == 127))
 				{
 					if(!(damagetype & DMG_CRIT))
 					{
 						damagetype |= DMG_CRIT;
-						if(weaponIndex == 308) damage *= 1.35;
-						else if(weaponIndex == 127)
-						{
-							float dist = getPlayerDistance(attacker,victim);
-							damage = 112.5;
-							if(dist<512)
-								damage *= 1.0 + 0.2*(512-dist)/512;
-							damage *= 1.35;
-						}
+						float dist = getPlayerDistance(attacker,victim);
+						damage = 112.5;
+						if(dist<512)
+							damage *= 1.0 + 0.2*(512-dist)/512;
+						damage *= 1.35;
 					}
 				}
 			}
