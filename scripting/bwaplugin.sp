@@ -4996,8 +4996,8 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					{
 						if ((buttons & IN_JUMP == IN_JUMP) && !(g_LastButtons[iClient] & IN_JUMP == IN_JUMP) && g_meterSec[iClient]>0.25 && currVel[2]>-600)
 						{
-							currVel[0] = 0.0;
-							currVel[1] = 0.0;
+							// currVel[0] = 0.0;
+							// currVel[1] = 0.0;
 							if(currVel[2]>-500)
 							{
 								currVel[2]=-500.0;
