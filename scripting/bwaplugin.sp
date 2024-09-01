@@ -1272,7 +1272,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//The Mantreads
 			case 444:
 			{
-				TF2Attrib_SetByDefIndex(secondary,207,1.0); //blast dmg to self decreased
+				// TF2Attrib_SetByDefIndex(secondary,207,1.0); //blast dmg to self decreased
 			}
 			// //Chargin' Targe
 			// case 131,1144:
@@ -3851,13 +3851,13 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 				{
 					TF2Attrib_SetByDefIndex(primary,100,1.0);
 				}
-				int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
-				int secondaryIndex = -1;
-				if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-				if(secondaryIndex==444) //mantreads resistance
-				{
-					TF2Attrib_SetByDefIndex(secondary,207,0.35); //blast dmg to self decreased
-				}
+				// int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
+				// int secondaryIndex = -1;
+				// if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+				// if(secondaryIndex==444) //mantreads resistance
+				// {
+				// 	g_condFlags[iClient] |= TF_CONDFLAG_DIVE;
+				// }
 			}
 			if(condition==TFCond_Slowed)
 			{
@@ -6297,6 +6297,23 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 	}
 	else if(attacker == victim)
 	{
+		if (victimClass == TFClass_Soldier)
+		{
+			int secondary = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Secondary, true);
+			int secondaryIndex = -1;
+			if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+			if(secondaryIndex == 444)
+			{
+				if(g_condFlags[victim] & TF_CONDFLAG_DIVE == TF_CONDFLAG_DIVE)
+				{
+					damage *= 0.35; //reduce self-damage with mantreads
+				}
+				else
+				{
+					g_condFlags[victim] |= TF_CONDFLAG_DIVE;
+				}
+			}
+		}
 		if (victimClass == TFClass_Engineer)
 		{
 			int secondary = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Secondary, true);
@@ -8239,7 +8256,9 @@ public Action ResetBlast(Handle timer, int iClient)
 			float vel[3];
 			GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
 			if((clientFlags & FL_ONGROUND) && vel[2]==0.0)
-				TF2Attrib_SetByDefIndex(secondary,207,1.0); //blast dmg to self decreased
+			{
+				g_condFlags[iClient] &= ~TF_CONDFLAG_DIVE;
+			}
 		}
 	}
 	return Plugin_Continue;
