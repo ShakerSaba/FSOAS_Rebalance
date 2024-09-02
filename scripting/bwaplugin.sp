@@ -1489,6 +1489,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					{
 						// SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",100.0,2);
 						TF2Attrib_SetByDefIndex(melee,412,1.0); //dmg taken increased
+						TF2Attrib_SetByDefIndex(melee,180,50.0); //heal on kill
 						// TF2Attrib_SetByDefIndex(melee,264,1.5); //melee range multiplier
 						// TF2Attrib_SetByDefIndex(melee,773,1.35); //deploy time increased
 					}
@@ -3876,7 +3877,10 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 				TF2Attrib_SetByDefIndex(secondary,329,0.25); //airblast vulnerability multiplier
 				g_meterSec[iClient] = 0.0;
 				int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
-				TF2Attrib_SetByDefIndex(melee,180,50.0); //heal on kill
+				int meleeIndex = -1;
+				if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+				if(meleeIndex == 310) TF2Attrib_SetByDefIndex(melee,180,100.0); //heal on kill
+				else TF2Attrib_SetByDefIndex(melee,180,50.0); //heal on kill
 				time = 12.0;
 			}
 			if(condition == TFCond_RestrictToMelee)
@@ -4062,7 +4066,10 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 				TF2Attrib_SetByDefIndex(secondary,252,1.0); //damage force reduction
 				TF2Attrib_SetByDefIndex(secondary,329,1.0); //airblast vulnerability multiplier
 				int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
-				TF2Attrib_SetByDefIndex(melee,180,0.0); //heal on kill
+				int meleeIndex = -1;
+				if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+				if(meleeIndex == 310) TF2Attrib_SetByDefIndex(melee,180,100.0); //heal on kill
+				else TF2Attrib_SetByDefIndex(melee,180,50.0); //heal on kill
 			}
 		}
 		case TFClass_Medic:
