@@ -1093,7 +1093,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					// SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon",primary);
 					EquipPlayerWeapon(iClient, primary);
 					int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-					SetEntProp(iClient, Prop_Data, "m_iAmmo", 1 , _, secondaryAmmo);
+					SetEntProp(iClient, Prop_Data, "m_iAmmo", 0 , _, secondaryAmmo);
 				}
 			}
 			//Dalokohs Bar
@@ -1812,7 +1812,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 	int victim = event.GetInt("victim_entindex");
 	int weaponIndex = event.GetInt("weapon_def_index");
-	int customKill = event.GetInt("customkill");
+	int customKill = event.GetInt("customkill"); // 25=defensive sticky, airburst sticky, standard sticky
 	int inflict = event.GetInt("inflictor_entindex");
 
 	g_flameDamage[victim] = 0.0;
@@ -1820,49 +1820,209 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 
 	if(IsValidClient(attacker))
 	{
-		int primary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Primary, true);
-		int primaryIndex = -1;
-		if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-		int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
-		int secondaryIndex = -1;
-		if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-		int melee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
-		int meleeIndex = -1;
-		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
-
-		//credit "finished off" and shield kills with on-kill bonuses
-		if(attacker != inflict)
+		if(customKill!=TF_CUSTOM_DEFENSIVE_STICKY && customKill!=TF_CUSTOM_AIR_STICKY_BURST && customKill!=TF_CUSTOM_STANDARD_STICKY)
 		{
-			if(inflict == -1)//finished off
-			{
-				// has booties?
-				float addCharge = 0.0;
-				if(weaponIndex == meleeIndex && (primaryIndex == 405 || primaryIndex == 608)) addCharge += 25; //add booties on-kill
-				if(weaponIndex == meleeIndex && secondaryIndex == 1099) addCharge += 75; //add tide turner on-kill
+			int primary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Primary, true);
+			int primaryIndex = -1;
+			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
+			int secondary = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Secondary, true);
+			int secondaryIndex = -1;
+			if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+			int melee = TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true);
+			int meleeIndex = -1;
+			if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 
-				switch(weaponIndex)
+			//credit "finished off" and shield kills with on-kill bonuses
+			if(attacker != inflict)
+			{
+				if(inflict == -1)//finished off
 				{
-					case 317: //candy cane
+					// has booties?
+					float addCharge = 0.0;
+					if(weaponIndex == meleeIndex && (primaryIndex == 405 || primaryIndex == 608)) addCharge += 25; //add booties on-kill
+					if(weaponIndex == meleeIndex && secondaryIndex == 1099) addCharge += 75; //add tide turner on-kill
+
+					switch(weaponIndex)
 					{
-						//to be done
+						case 317: //candy cane
+						{
+							//to be done
+						}
+						case 1104: //air strike
+						{
+							int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
+							int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
+							SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
+						}
+						case 38,1000: //axtinguisher
+						{
+							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+						}
+						case 214: //powerjack
+						{
+							SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
+							ShowHudText(attacker,4,"+25 HP");
+							TF2Util_TakeHealth(attacker,25.0);
+						}
+						case 132,266,482,1082: //eyelander
+						{
+							int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
+							int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
+							SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
+							DataPack pack = new DataPack();
+							pack.Reset();
+							pack.WriteCell(attacker);
+							pack.WriteCell(heads+1+vicheads);
+							pack.WriteCell(0);
+							RequestFrame(updateHeads,pack);
+							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.0);
+						}
+						case 357: //half-zatoichi
+						{
+							int maxHealth = 200;
+							if(TF2_GetPlayerClass(attacker)==TFClass_DemoMan && primaryIndex != 405 && primaryIndex != 608)
+								maxHealth = 175;
+							else if(TF2_GetPlayerClass(attacker)==TFClass_Soldier && secondaryIndex == 226)
+								maxHealth = 220;
+							int currHealth = GetClientHealth(attacker);
+
+							float healing = maxHealth/2+currHealth > maxHealth*1.5 ? maxHealth*1.5-currHealth : maxHealth/2.0;
+							SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
+							ShowHudText(attacker,4,"+%.0f HP",healing);
+							TF2Util_TakeHealth(attacker,healing,TAKEHEALTH_IGNORE_MAXHEALTH);
+							int kills = GetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy");
+							SetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy",kills+1);
+						}
+						case 327: //claidheamh mor
+						{
+							addCharge += 25;
+							bool replenished = false;
+							//check ammo to be replenished
+							if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
+							{
+								int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+								int clip = GetEntData(primary, iAmmoTable, 4);
+								int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+								int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+								if(ammoCount>0 && (clip<4 || clip<2 && primaryIndex==308))
+								{
+									replenished = true;
+									SetEntData(primary, iAmmoTable, clip+1, _, true);
+									SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+								}
+							}
+							if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
+							{
+								int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+								int clip = GetEntData(secondary, iAmmoTable, 4);
+								int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+								int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
+								if(ammoCount>0 && (clip<8 || clip<4 && secondaryIndex==1150))
+								{
+									replenished = true;
+									SetEntData(secondary, iAmmoTable, clip+1, _, true);
+									SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
+								}
+							}
+							if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
+						}
+						case 43: //KGB
+						{
+							TF2_AddCondition(attacker,TFCond_CritOnKill,6.0);
+						}
+						case 310: //warrior's spirit
+						{
+							SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
+							ShowHudText(attacker,4,"+50 HP");
+							TF2Util_TakeHealth(attacker,50.0);
+							int kills = GetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy");
+							SetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy",kills+1);
+						}
+						case 141,1004: //frontier justice
+						{
+							//to be done
+						}
+						case 171: //tribalman's shiv
+						{
+							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,2.1);
+						}
+						case 461: //big earner
+						{
+							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+						}
+						case 1103: //back scatter on-kill
+						{
+							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							int clip = GetEntData(primary, iAmmoTable, 4);
+							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+							int max = 4;
+							if(g_bIsMVM)
+							{
+								Address addr = TF2Attrib_GetByName(primary, "clip size bonus");
+								if(addr != Address_Null)
+								{
+									float value = TF2Attrib_GetValue(addr);
+									max = RoundFloat(max * value);
+								}
+							}
+							if(ammoCount>0)
+							{
+								int amount = ammoCount > 1 && clip <= (max + 3) ? 2 : 1;
+								EmitSoundToClient(attacker,"items/ammo_pickup.wav");
+								SetEntData(primary, iAmmoTable, clip+amount, _, true);
+								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
+							}
+						}
+						case 460: //enforcer disguise on kill
+						{
+							RequestFrame(SetDisguise,attacker);
+						}
+						case 308: //Loch-n-Load reload on kill
+						{
+							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+							int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+							int clip = 2;
+							if(currAmmo>0)
+							{
+								SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
+								SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
+								SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
+								Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
+								if(addr != Address_Null && meleeIndex != 327)
+								{
+									TF2Attrib_SetByDefIndex(attacker,177,0.5715);
+									g_holstering[attacker] = 1.0;
+								}
+								EquipPlayerWeapon(attacker, primary);
+							}
+						}
+						case 939: //spooky skeleton
+						{
+							if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
+						}
 					}
-					case 1104: //air strike
+
+					if(addCharge>0)
 					{
-						int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
-						int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
-						SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
+						float meter = GetEntPropFloat(attacker, Prop_Send,"m_flChargeMeter");
+						if(meter+addCharge > 100) meter = 100.0;
+						else meter+=addCharge;
+
+						DataPack pack = new DataPack();
+						pack.Reset();
+						pack.WriteCell(attacker);
+						pack.WriteFloat(meter);
+						RequestFrame(updateShield,pack);
 					}
-					case 38,1000: //axtinguisher
-					{
-						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
-					}
-					case 214: //powerjack
-					{
-						SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
-						ShowHudText(attacker,4,"+25 HP");
-						TF2Util_TakeHealth(attacker,25.0);
-					}
-					case 132,266,482,1082: //eyelander
+				}
+				else if(inflict == secondary) //shield bash kills
+				{
+					float addCharge = 0.0;
+					if(primaryIndex == 405 || primaryIndex == 608) addCharge += 25; //add booties on-kill
+					if(secondaryIndex == 1099) addCharge += 75; //add tide turner on-kill
+					if(meleeIndex == 327) addCharge += 25; //add claid on-kill
+					if(meleeIndex==132 || meleeIndex==266 || meleeIndex==482 || meleeIndex==1082) //eyelander on-kill
 					{
 						int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
 						int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
@@ -1875,7 +2035,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 						RequestFrame(updateHeads,pack);
 						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.0);
 					}
-					case 357: //half-zatoichi
+					if(meleeIndex==357) //half-zatoichi on-kill
 					{
 						int maxHealth = 200;
 						if(TF2_GetPlayerClass(attacker)==TFClass_DemoMan && primaryIndex != 405 && primaryIndex != 608)
@@ -1891,396 +2051,239 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 						int kills = GetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy");
 						SetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy",kills+1);
 					}
-					case 327: //claidheamh mor
-					{
-						addCharge += 25;
-						bool replenished = false;
-						//check ammo to be replenished
-						if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
-						{
-							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-							int clip = GetEntData(primary, iAmmoTable, 4);
-							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-							if(ammoCount>0 && (clip<4 || clip<2 && primaryIndex==308))
-							{
-								replenished = true;
-								SetEntData(primary, iAmmoTable, clip+1, _, true);
-								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
-							}
-						}
-						if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
-						{
-							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-							int clip = GetEntData(secondary, iAmmoTable, 4);
-							int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-							int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
-							if(ammoCount>0 && (clip<8 || clip<4 && secondaryIndex==1150))
-							{
-								replenished = true;
-								SetEntData(secondary, iAmmoTable, clip+1, _, true);
-								SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
-							}
-						}
-						if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-					}
-					case 43: //KGB
-					{
-						TF2_AddCondition(attacker,TFCond_CritOnKill,6.0);
-					}
-					case 310: //warrior's spirit
-					{
-						SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
-						ShowHudText(attacker,4,"+50 HP");
-						TF2Util_TakeHealth(attacker,50.0);
-						int kills = GetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy");
-						SetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy",kills+1);
-					}
-					case 141,1004: //frontier justice
-					{
-						//to be done
-					}
-					case 171: //tribalman's shiv
-					{
-						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,2.1);
-					}
-					case 461: //big earner
-					{
-						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
-					}
-					case 1103: //back scatter on-kill
-					{
-						int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-						int clip = GetEntData(primary, iAmmoTable, 4);
-						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-						int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-						int max = 4;
-						if(g_bIsMVM)
-						{
-							Address addr = TF2Attrib_GetByName(primary, "clip size bonus");
-							if(addr != Address_Null)
-							{
-								float value = TF2Attrib_GetValue(addr);
-								max = RoundFloat(max * value);
-							}
-						}
-						if(ammoCount>0)
-						{
-							int amount = ammoCount > 1 && clip <= (max + 3) ? 2 : 1;
-							EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-							SetEntData(primary, iAmmoTable, clip+amount, _, true);
-							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
-						}
-					}
-					case 460: //enforcer disguise on kill
-					{
-						RequestFrame(SetDisguise,attacker);
-					}
-					case 308: //Loch-n-Load reload on kill
-					{
-						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-						int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-						int clip = 2;
-						if(currAmmo>0)
-						{
-							SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
-							SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
-							SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
-							Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
-							if(addr != Address_Null && meleeIndex != 327)
-							{
-								TF2Attrib_SetByDefIndex(attacker,177,0.5715);
-								g_holstering[attacker] = 1.0;
-							}
-							EquipPlayerWeapon(attacker, primary);
-						}
-					}
-					case 939: //spooky skeleton
-					{
-						if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
-					}
-				}
 
-				if(addCharge>0)
-				{
-					float meter = GetEntPropFloat(attacker, Prop_Send,"m_flChargeMeter");
-					if(meter+addCharge > 100) meter = 100.0;
-					else meter+=addCharge;
-
+					if(addCharge>100) addCharge = 100.0; 
+					
 					DataPack pack = new DataPack();
 					pack.Reset();
 					pack.WriteCell(attacker);
-					pack.WriteFloat(meter);
+					pack.WriteFloat(addCharge);
 					RequestFrame(updateShield,pack);
 				}
 			}
-			else if(inflict == secondary) //shield bash kills
-			{
-				float addCharge = 0.0;
-				if(primaryIndex == 405 || primaryIndex == 608) addCharge += 25; //add booties on-kill
-				if(secondaryIndex == 1099) addCharge += 75; //add tide turner on-kill
-				if(meleeIndex == 327) addCharge += 25; //add claid on-kill
-				if(meleeIndex==132 || meleeIndex==266 || meleeIndex==482 || meleeIndex==1082) //eyelander on-kill
-				{
-					int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
-					int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
-					SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
-					DataPack pack = new DataPack();
-					pack.Reset();
-					pack.WriteCell(attacker);
-					pack.WriteCell(heads+1+vicheads);
-					pack.WriteCell(0);
-					RequestFrame(updateHeads,pack);
-					TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.0);
-				}
-				if(meleeIndex==357) //half-zatoichi on-kill
-				{
-					int maxHealth = 200;
-					if(TF2_GetPlayerClass(attacker)==TFClass_DemoMan && primaryIndex != 405 && primaryIndex != 608)
-						maxHealth = 175;
-					else if(TF2_GetPlayerClass(attacker)==TFClass_Soldier && secondaryIndex == 226)
-						maxHealth = 220;
-					int currHealth = GetClientHealth(attacker);
 
-					float healing = maxHealth/2+currHealth > maxHealth*1.5 ? maxHealth*1.5-currHealth : maxHealth/2.0;
-					SetHudTextParams(0.1, -0.16, 0.1, 255, 255, 255, 255);
-					ShowHudText(attacker,4,"+%.0f HP",healing);
-					TF2Util_TakeHealth(attacker,healing,TAKEHEALTH_IGNORE_MAXHEALTH);
-					int kills = GetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy");
-					SetEntProp(attacker, Prop_Send, "m_iKillCountSinceLastDeploy",kills+1);
+			switch(secondaryIndex)
+			{
+				case 58,1083,1105: //jarate recharges on kill
+				{
+					float secondaryLast = GetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime");
+					SetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime", secondaryLast-8);
+					float secondaryRegen = GetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime");
+					SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime", secondaryRegen-8);
 				}
+				case 751: //carbine recharges on kill
+				{
+					if(weaponIndex == secondaryIndex && !TF2_IsPlayerInCondition(attacker,TFCond_CritCola))
+					{
+						float secondaryRegen = GetEntPropFloat(secondary, Prop_Send, "m_flMinicritCharge");
+						SetEntPropFloat(secondary, Prop_Send, "m_flMinicritCharge", secondaryRegen+20.0);
+					}
+				}
+			}
 
-				if(addCharge>100) addCharge = 100.0; 
-				
-				DataPack pack = new DataPack();
-				pack.Reset();
-				pack.WriteCell(attacker);
-				pack.WriteFloat(addCharge);
-				RequestFrame(updateShield,pack);
-			}
-		}
-
-		switch(secondaryIndex)
-		{
-			case 58,1083,1105: //jarate recharges on kill
+			//diamondback, minicrits on kill
+			if(TFClass_Spy==TF2_GetPlayerClass(attacker) && weaponIndex == meleeIndex && secondaryIndex==525)
 			{
-				float secondaryLast = GetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime");
-				SetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime", secondaryLast-8);
-				float secondaryRegen = GetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime");
-				SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime", secondaryRegen-8);
-			}
-			case 751: //carbine recharges on kill
-			{
-				if(weaponIndex == secondaryIndex && !TF2_IsPlayerInCondition(attacker,TFCond_CritCola))
+				float time = 5.1;
+				if(g_bIsMVM) //add mvm crits on kill
 				{
-					float secondaryRegen = GetEntPropFloat(secondary, Prop_Send, "m_flMinicritCharge");
-					SetEntPropFloat(secondary, Prop_Send, "m_flMinicritCharge", secondaryRegen+20.0);
-				}
-			}
-		}
-
-		//diamondback, minicrits on kill
-		if(TFClass_Spy==TF2_GetPlayerClass(attacker) && weaponIndex == meleeIndex && secondaryIndex==525)
-		{
-			float time = 5.1;
-			if(g_bIsMVM) //add mvm crits on kill
-			{
-				Address addr = TF2Attrib_GetByName(melee, "critboost on kill");
-				if(addr != Address_Null)
-				{
-					float value = TF2Attrib_GetValue(addr);
-					time += value;
-				}
-			}
-			TF2_AddCondition(attacker,TFCond_CritCola,time);
-		}
-		
-		switch(weaponIndex)
-		{
-			case 811,832: //Heater explode on kill
-			{
-				float toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,430));
-				if (toggle==12.0 && attacker!=victim)
-				{
-					g_condFlags[victim] |= TF_CONDFLAG_HEATER;
-					float victimPos[3];
-					GetEntPropVector(victim, Prop_Send, "m_vecOrigin", victimPos);
-					EmitAmbientSound("misc/halloween/spell_fireball_impact.wav",victimPos,victim);
-					CreateParticle(victim,"ExplosionCore_MidAir_Flare",5.0,_,_,_,_,100.0,1.5,false);
-					CreateParticle(victim,"heavy_ring_of_fire",2.0,_,_,_,_,5.0,_,false,false);
-
-					DataPack pack = new DataPack();
-					pack.Reset();
-					pack.WriteCell(attacker);
-					pack.WriteCell(victim);
-					CreateTimer(0.015,updateRing,pack);
-					CreateTimer(0.135,updateRing,pack);
-					CreateTimer(0.255,updateRing,pack);
-				}
-			}
-			case 132,266,482,1082: //eyelander
-			{
-				//adjust max health on kill
-				int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
-				DataPack pack = new DataPack();
-				pack.Reset();
-				pack.WriteCell(attacker);
-				pack.WriteCell(heads);
-				pack.WriteCell(0);
-				RequestFrame(updateHeads,pack);
-			}
-			case 356: //Kunai health on kill
-			{
-				if(customKill == TF_CUSTOM_BACKSTAB)
-				{
-					// Address addr = TF2Attrib_GetByDefIndex(melee,125);
-					float maxHP = RoundToFloor(g_meterMel[attacker])+0.0;
-					//increase max HP by +45 up to +90
-					maxHP = maxHP + 30.0 > 90.0 ? 90.0 : maxHP + 30.0;
-					//heal 45 HP
-					float currHP = GetClientHealth(attacker)+0.0;
-					float health = currHP + 60 > (maxHP+85)*1.5 ? (maxHP+85)*1.5 - currHP : 60.0;
-					TF2Attrib_SetByDefIndex(melee,125,-40+maxHP); //max health additive penalty
-					g_meterMel[attacker] = maxHP;
-
-					SetHudTextParams(0.1, -0.16, 0.2, 255, 255, 255, 255);
-					ShowHudText(attacker,4,"+%.0f HP",health);
-					TF2Util_TakeHealth(attacker,health,TAKEHEALTH_IGNORE_MAXHEALTH);
-					
-				}
-			}
-			case 649: //Spy-Cicle on kill
-			{
-				if(customKill == TF_CUSTOM_BACKSTAB)
-				{
-					float meter = GetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",2); //durability meter
-					if (meter-67 > 0)
-						SetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",meter-67.0,2);
-					else
-						MeltKnife(attacker,melee,15.0);
-				}
-			}
-			case 1103: //back scatter on-kill
-			{
-				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-				int clip = GetEntData(primary, iAmmoTable, 4);
-				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-				int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-				int max = 4;
-				if(g_bIsMVM)
-				{
-					Address addr = TF2Attrib_GetByName(primary, "clip size bonus");
+					Address addr = TF2Attrib_GetByName(melee, "critboost on kill");
 					if(addr != Address_Null)
 					{
 						float value = TF2Attrib_GetValue(addr);
-						max = RoundFloat(max * value);
+						time += value;
 					}
 				}
-				if(ammoCount>0)
-				{
-					int amount = ammoCount > 1 && clip <= (max + 3) ? 2 : 1;
-					EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-					SetEntData(primary, iAmmoTable, clip+amount, _, true);
-					SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
-				}
+				TF2_AddCondition(attacker,TFCond_CritCola,time);
 			}
-			case 327: //claidheamh mor on-kill
+			
+			switch(weaponIndex)
 			{
-				bool replenished = false;
-				//check ammo to be replenished
-				if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
+				case 811,832: //Heater explode on kill
+				{
+					float toggle = TF2Attrib_GetValue(TF2Attrib_GetByDefIndex(primary,430));
+					if (toggle==12.0 && attacker!=victim)
+					{
+						g_condFlags[victim] |= TF_CONDFLAG_HEATER;
+						float victimPos[3];
+						GetEntPropVector(victim, Prop_Send, "m_vecOrigin", victimPos);
+						EmitAmbientSound("misc/halloween/spell_fireball_impact.wav",victimPos,victim);
+						CreateParticle(victim,"ExplosionCore_MidAir_Flare",5.0,_,_,_,_,100.0,1.5,false);
+						CreateParticle(victim,"heavy_ring_of_fire",2.0,_,_,_,_,5.0,_,false,false);
+
+						DataPack pack = new DataPack();
+						pack.Reset();
+						pack.WriteCell(attacker);
+						pack.WriteCell(victim);
+						CreateTimer(0.015,updateRing,pack);
+						CreateTimer(0.135,updateRing,pack);
+						CreateTimer(0.255,updateRing,pack);
+					}
+				}
+				case 132,266,482,1082: //eyelander
+				{
+					//adjust max health on kill
+					int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
+					DataPack pack = new DataPack();
+					pack.Reset();
+					pack.WriteCell(attacker);
+					pack.WriteCell(heads);
+					pack.WriteCell(0);
+					RequestFrame(updateHeads,pack);
+				}
+				case 356: //Kunai health on kill
+				{
+					if(customKill == TF_CUSTOM_BACKSTAB)
+					{
+						// Address addr = TF2Attrib_GetByDefIndex(melee,125);
+						float maxHP = RoundToFloor(g_meterMel[attacker])+0.0;
+						//increase max HP by +45 up to +90
+						maxHP = maxHP + 30.0 > 90.0 ? 90.0 : maxHP + 30.0;
+						//heal 45 HP
+						float currHP = GetClientHealth(attacker)+0.0;
+						float health = currHP + 60 > (maxHP+85)*1.5 ? (maxHP+85)*1.5 - currHP : 60.0;
+						TF2Attrib_SetByDefIndex(melee,125,-40+maxHP); //max health additive penalty
+						g_meterMel[attacker] = maxHP;
+
+						SetHudTextParams(0.1, -0.16, 0.2, 255, 255, 255, 255);
+						ShowHudText(attacker,4,"+%.0f HP",health);
+						TF2Util_TakeHealth(attacker,health,TAKEHEALTH_IGNORE_MAXHEALTH);
+						
+					}
+				}
+				case 649: //Spy-Cicle on kill
+				{
+					if(customKill == TF_CUSTOM_BACKSTAB)
+					{
+						float meter = GetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",2); //durability meter
+						if (meter-67 > 0)
+							SetEntPropFloat(attacker, Prop_Send,"m_flItemChargeMeter",meter-67.0,2);
+						else
+							MeltKnife(attacker,melee,15.0);
+					}
+				}
+				case 1103: //back scatter on-kill
 				{
 					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 					int clip = GetEntData(primary, iAmmoTable, 4);
 					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-					if(ammoCount>0 && (clip<4 && primaryIndex!=308 || clip<2 && primaryIndex==308))
+					int max = 4;
+					if(g_bIsMVM)
 					{
-						replenished = true;
-						SetEntData(primary, iAmmoTable, clip+1, _, true);
-						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+						Address addr = TF2Attrib_GetByName(primary, "clip size bonus");
+						if(addr != Address_Null)
+						{
+							float value = TF2Attrib_GetValue(addr);
+							max = RoundFloat(max * value);
+						}
+					}
+					if(ammoCount>0)
+					{
+						int amount = ammoCount > 1 && clip <= (max + 3) ? 2 : 1;
+						EmitSoundToClient(attacker,"items/ammo_pickup.wav");
+						SetEntData(primary, iAmmoTable, clip+amount, _, true);
+						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-amount, _,primaryAmmo);
 					}
 				}
-				if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
+				case 327: //claidheamh mor on-kill
 				{
-					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-					int clip = GetEntData(secondary, iAmmoTable, 4);
-					int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-					int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
-					if(ammoCount>0 && (clip<8 && secondaryIndex!=1150 || clip<4 && secondaryIndex==1150))
+					bool replenished = false;
+					//check ammo to be replenished
+					if(primaryIndex!=405 && primaryIndex!=608 && primaryIndex!=1101)
 					{
-						replenished = true;
-						SetEntData(secondary, iAmmoTable, clip+1, _, true);
-						SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
+						int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+						int clip = GetEntData(primary, iAmmoTable, 4);
+						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+						int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+						if(ammoCount>0 && (clip<4 && primaryIndex!=308 || clip<2 && primaryIndex==308))
+						{
+							replenished = true;
+							SetEntData(primary, iAmmoTable, clip+1, _, true);
+							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,primaryAmmo);
+						}
+					}
+					if(secondaryIndex!=131 && secondaryIndex!=406 && secondaryIndex!=1099 && secondaryIndex!=1144)
+					{
+						int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+						int clip = GetEntData(secondary, iAmmoTable, 4);
+						int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+						int ammoCount = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, secondaryAmmo);
+						if(ammoCount>0 && (clip<8 && secondaryIndex!=1150 || clip<4 && secondaryIndex==1150))
+						{
+							replenished = true;
+							SetEntData(secondary, iAmmoTable, clip+1, _, true);
+							SetEntProp(attacker, Prop_Data, "m_iAmmo", ammoCount-1, _,secondaryAmmo);
+						}
+					}
+					if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
+				}
+				case 460: //enforcer disguise on kill
+				{
+					RequestFrame(SetDisguise,attacker);
+				}
+				case 308: //Loch-n-Load reload on kill
+				{
+					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+					int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
+					int clip = 2;
+					if(currAmmo>0)
+					{
+						SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
+						SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
+						SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
+						Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
+						if(addr != Address_Null && meleeIndex != 327)
+						{
+							TF2Attrib_SetByDefIndex(attacker,177,0.5715);
+							g_holstering[attacker] = 1.0;
+						}
+						EquipPlayerWeapon(attacker, primary);
 					}
 				}
-				if(replenished) EmitSoundToClient(attacker,"items/ammo_pickup.wav");
-			}
-			case 460: //enforcer disguise on kill
-			{
-				RequestFrame(SetDisguise,attacker);
-			}
-			case 308: //Loch-n-Load reload on kill
-			{
-				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-				int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-				int clip = 2;
-				if(currAmmo>0)
+				case 939: //spooky skeleton
 				{
-					SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
-					SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
-					SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
-					Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
-					if(addr != Address_Null && meleeIndex != 327)
+					if((IS_HALLOWEEN) && attacker!=victim) RequestFrame(SpawnSpooky,victim);
+				}
+			}
+
+			int victimMelee = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Melee, true);
+			int victimMeleeIndex = -1;
+			if(victimMelee >= 0) victimMeleeIndex = GetEntProp(victimMelee, Prop_Send, "m_iItemDefinitionIndex");
+			if(victimMeleeIndex==939 && attacker!=victim) //bat outta hell
+			{
+				if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
+			}
+
+			switch(meleeIndex)
+			{
+				case 355:
+				{
+					//marked speed buff for Fan O'War
+					if(TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeath)==attacker)
 					{
-						TF2Attrib_SetByDefIndex(attacker,177,0.5715);
-						g_holstering[attacker] = 1.0;
+						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
 					}
-					EquipPlayerWeapon(attacker, primary);
 				}
-			}
-			case 939: //spooky skeleton
-			{
-				if((IS_HALLOWEEN) && attacker!=victim) RequestFrame(SpawnSpooky,victim);
-			}
-		}
-
-		int victimMelee = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Melee, true);
-		int victimMeleeIndex = -1;
-		if(victimMelee >= 0) victimMeleeIndex = GetEntProp(victimMelee, Prop_Send, "m_iItemDefinitionIndex");
-		if(victimMeleeIndex==939 && attacker!=victim) //bat outta hell
-		{
-			if(IS_HALLOWEEN) RequestFrame(SpawnSpooky,victim);
-		}
-
-		switch(meleeIndex)
-		{
-			case 355:
-			{
-				//marked speed buff for Fan O'War
-				if(TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeath)==attacker)
+				case 154:
 				{
-					TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+					//speed boost for killing user on objective Pain Train
+					if(g_condFlags[victim] & TF_CONDFLAG_CAPPING)
+					{
+						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
+					}
 				}
 			}
-			case 154:
-			{
-				//speed boost for killing user on objective Pain Train
-				if(g_condFlags[victim] & TF_CONDFLAG_CAPPING)
-				{
-					TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
-				}
-			}
-		}
 
-		if(TF2_GetPlayerClass(attacker)==TFClass_Heavy && secondaryIndex==311)
-		{
-			//increase steak duration on kill
-			float dur = TF2Util_GetPlayerConditionDuration(attacker,TFCond_CritCola);
-			if(dur>0)
+			if(TF2_GetPlayerClass(attacker)==TFClass_Heavy && secondaryIndex==311)
 			{
-				TF2Util_SetPlayerConditionDuration(attacker,TFCond_CritCola,dur+2);
-				TF2Util_SetPlayerConditionDuration(attacker,TFCond_RestrictToMelee,dur+2);
+				//increase steak duration on kill
+				float dur = TF2Util_GetPlayerConditionDuration(attacker,TFCond_CritCola);
+				if(dur>0)
+				{
+					TF2Util_SetPlayerConditionDuration(attacker,TFCond_CritCola,dur+2);
+					TF2Util_SetPlayerConditionDuration(attacker,TFCond_RestrictToMelee,dur+2);
+				}
 			}
 		}
 	}
