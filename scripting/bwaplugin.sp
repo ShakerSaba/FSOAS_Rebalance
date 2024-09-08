@@ -70,8 +70,8 @@ float IRON_DETECT = 80.0;
 float PARACHUTE_TIME = 6.0;
 float FIRE_TIME = 3.0;
 float HAND_MAX = 10.0;
-float PRESSURE_TIME = 5.0;
-float PRESSURE_FORCE = 2.75;
+float PRESSURE_TIME = 8.0;
+float PRESSURE_FORCE = 2.8;
 float HYPE_COST = 19.2;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
@@ -537,6 +537,19 @@ public Action LogGameMessage(const char[] message)
 		}
 		return Plugin_Changed;
 	}
+	else if(StrContains(message,"player_extinguished") && (StrContains(message,"tf_weapon_flamethrower") != -1 || StrContains(message,"tf_weapon_rocketlauncher_fireball") != -1))
+	{
+		int idStartPos = StrContains(message,"<")+1;
+		int idEndPos = StrContains(message,"[U:1:") - 2;
+		if(idEndPos < 0)
+			idEndPos = StrContains(message,"<BOT>") - 1;
+		char[] id = new char[MAX_NAME_LENGTH];
+		strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
+		id[idEndPos-idStartPos] = 0;
+		int user = GetClientOfUserId(StringToInt(id));
+		//refund pressure on extinguish
+		CreateTimer(0.045,ResetPressure,user);
+	}
 	return Plugin_Continue;
 }
 
@@ -838,7 +851,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				}
 				TF2Attrib_SetByDefIndex(primary,335,clip/20.0); //clip size upgrade
 				SetEntPropFloat(primary, Prop_Send, "m_flEnergy", clip);
-				TF2Attrib_SetByDefIndex(primary,103,1.33); //projectile speed
+				TF2Attrib_SetByDefIndex(primary,103,1.5); //projectile speed
 			}
 			//The Back Scatter
 			case 1103:
@@ -914,7 +927,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Loch-n-Load
 			case 308:
 			{
-				TF2Attrib_SetByDefIndex(primary,6,0.67); //fire rate bonus
+				// TF2Attrib_SetByDefIndex(primary,6,0.67); //fire rate bonus
+				// TF2Attrib_SetByDefIndex(primary,96,1.35); //Reload time increased
 				TF2Attrib_SetByDefIndex(primary,3,0.5); //clip size penalty
 				int clip = 2;
 				if(g_bIsMVM)
@@ -928,7 +942,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				}
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, clip, _, true);
-				TF2Attrib_SetByDefIndex(primary,96,1.35); //Reload time increased
 				TF2Attrib_SetByDefIndex(primary,137,1.0); //dmg bonus vs buildings
 				// TF2Attrib_SetByDefIndex(primary,114,1.0); //mini-crit airborne
 			}
@@ -1786,7 +1799,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_lastHit[iClient] = 0.0;
 		g_nextHit[iClient] = 0.0;
 		g_lastFlamed[iClient] = 0.0;
-		g_temperature[iClient] = 0.5;
+		g_temperature[iClient] = 0.0;
 		g_lastHeal[iClient] = 0;
 		g_lockOn[iClient] = 0;
 		g_holstering[iClient] = 0.0;
@@ -1981,13 +1994,24 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 						}
 						case 308: //Loch-n-Load reload on kill
 						{
+							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							int clip = GetEntData(primary, iAmmoTable, 4);
+							int maxClip = 2;
+							if(g_bIsMVM)
+							{
+								Address addr = TF2Attrib_GetByName(primary, "clip size upgrade atomic");
+								if(addr != Address_Null)
+								{
+									float value = TF2Attrib_GetValue(addr);
+									maxClip += RoundFloat(value);
+								}
+							}
 							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 							int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-							int clip = 2;
 							if(currAmmo>0)
 							{
-								SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
-								SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
+								SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo+clip>=maxClip ? maxClip : currAmmo+clip);
+								SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo+clip>=maxClip ? currAmmo+clip-maxClip : 0 , _, primaryAmmo);
 								SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
 								Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
 								if(addr != Address_Null && meleeIndex != 327)
@@ -2225,13 +2249,24 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 				}
 				case 308: //Loch-n-Load reload on kill
 				{
+					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+					int clip = GetEntData(primary, iAmmoTable, 4);
+					int maxClip = 2;
+					if(g_bIsMVM)
+					{
+						Address addr = TF2Attrib_GetByName(primary, "clip size upgrade atomic");
+						if(addr != Address_Null)
+						{
+							float value = TF2Attrib_GetValue(addr);
+							maxClip += RoundFloat(value);
+						}
+					}
 					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 					int currAmmo = GetEntProp(attacker, Prop_Data, "m_iAmmo", _, primaryAmmo);
-					int clip = 2;
 					if(currAmmo>0)
 					{
-						SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
-						SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
+						SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo+clip>=maxClip ? maxClip : currAmmo+clip);
+						SetEntProp(attacker, Prop_Data, "m_iAmmo", currAmmo+clip>=maxClip ? currAmmo+clip-maxClip : 0 , _, primaryAmmo);
 						SetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon", melee);
 						Address addr = TF2Attrib_GetByName(melee, "is_a_sword");
 						if(addr != Address_Null && meleeIndex != 327)
@@ -2414,10 +2449,10 @@ public void OnGameFrame()
 			int sapper = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Building, true);
 			int current = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 
-			if(GetGameTime() - g_lastFlamed[iClient] > 6.0/66 && g_temperature[iClient]>0.5) //client temperature from flamethrowers
+			if(GetGameTime() - g_lastFlamed[iClient] > 6.0/66 && g_temperature[iClient]>0.0) //client temperature from flamethrowers
 			{
-				g_temperature[iClient] *= 0.971875; //25 frames to decrease to 0, 31 frames total including grace period
-				if(g_temperature[iClient]<0.5) g_temperature[iClient] = 0.5;
+				g_temperature[iClient] -= 0.045; //22 frames to decrease to 0, 28 frames total including grace period
+				if(g_temperature[iClient]<0.0) g_temperature[iClient] = 0.0;
 			}
 
 			if(g_condFlags[iClient] & TF_CONDFLAG_FANHIT || g_condFlags[iClient] & TF_CONDFLAG_FANFLY) //track force-a-nature knockback
@@ -2782,6 +2817,12 @@ public void OnGameFrame()
 					}
 					case TFClass_Pyro:
 					{
+						// int aim = GetClientAimTarget(iClient);
+						// if(aim>0)
+						// {
+						// 	SetHudTextParams(-1.0, -0.4, 0.1, 255, 255, 255, 255);
+						// 	ShowHudText(iClient,1,"%.4f TEMP",g_temperature[aim]);
+						// }
 						if(primaryIndex != 594 && primaryIndex !=1 && primary!=-1) //handle airblast, except for dragon's fury and phlog
 						{
 							float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
@@ -2805,6 +2846,7 @@ public void OnGameFrame()
 									}
 								}
 								if(primaryIndex==40 || primaryIndex==1146) increment *= 0.67; //backburner slower recharge
+								if(primaryIndex==215) increment *= 1.4; //degreaser faster recharge
 								if(primaryIndex == 1178)
 								{
 									float rate = GetEntPropFloat(primary, Prop_Send, "m_flRechargeScale");
@@ -2961,31 +3003,31 @@ public void OnGameFrame()
 					{
 						switch(primaryIndex)
 						{
-							case 308: //loch-n-load reload
-							{
-								if(GetEntProp(primary, Prop_Send, "m_iReloadMode")==2)
-								{
-									if(GetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack") - GetGameTime() < 0.1)
-									{
-										int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-										int currAmmo = GetEntProp(iClient, Prop_Data, "m_iAmmo", _, primaryAmmo);
-										int clip = 2;
-										if(g_bIsMVM)
-										{
-											Address addr = TF2Attrib_GetByName(primary, "clip size upgrade atomic");
-											if(addr != Address_Null)
-											{
-												float value = TF2Attrib_GetValue(addr);
-												clip += RoundFloat(value);
-											}
-										}
-										SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
-										SetEntProp(iClient, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
-										SetEntProp(primary, Prop_Send, "m_iReloadMode",3);
-										SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.2);
-									}
-								}
-							}
+							// case 308: //loch-n-load reload
+							// {
+							// 	if(GetEntProp(primary, Prop_Send, "m_iReloadMode")==2)
+							// 	{
+							// 		if(GetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack") - GetGameTime() < 0.1)
+							// 		{
+							// 			int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+							// 			int currAmmo = GetEntProp(iClient, Prop_Data, "m_iAmmo", _, primaryAmmo);
+							// 			int clip = 2;
+							// 			if(g_bIsMVM)
+							// 			{
+							// 				Address addr = TF2Attrib_GetByName(primary, "clip size upgrade atomic");
+							// 				if(addr != Address_Null)
+							// 				{
+							// 					float value = TF2Attrib_GetValue(addr);
+							// 					clip += RoundFloat(value);
+							// 				}
+							// 			}
+							// 			SetEntProp(primary, Prop_Send, "m_iClip1",currAmmo>=clip ? clip : currAmmo);
+							// 			SetEntProp(iClient, Prop_Data, "m_iAmmo", currAmmo>=clip ? currAmmo-clip : 0 , _, primaryAmmo);
+							// 			SetEntProp(primary, Prop_Send, "m_iReloadMode",3);
+							// 			SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.2);
+							// 		}
+							// 	}
+							// }
 						}
 						switch(meleeIndex)
 						{
@@ -6413,7 +6455,8 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			float value = penal == Address_Null ? 1.0 : TF2Attrib_GetValue(penal);
 			Address bonus = TF2Attrib_GetByName(weapon, "damage bonus");
 			value *= bonus == Address_Null ? 1.0 : TF2Attrib_GetValue(bonus);
-			damage = 13.0 * g_temperature[victim] * value;
+			float temperature = GetMin(GetMax(g_temperature[victim],0.125),0.625) + 0.375; //bind temperature to be 0.5 to 1.0 plus the base
+			damage = 13.0 * temperature * value;
 
 			//crit damage multipliers
 			if(damagetype & DMG_CRIT)
@@ -6424,8 +6467,8 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				{
 					if(weaponIndex==594)  //check Phlog damage
 					{
-						float temp = g_temperature[victim]-0.5;
-						damage *= temp>0.5 ? 3.0 : 1.35 + 1.65*(temp/0.5);
+						float temp = temperature - 0.5;
+						damage *= 1.35 + 1.65*(temp/0.5);
 					}
 					else
 						damage *= 3.0;
@@ -6438,7 +6481,9 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			g_lastFlamed[victim] = GetGameTime();
 			if(g_temperature[victim] < 1.0)
 			{
-				g_temperature[victim] += 0.0185 + Pow(0.285*((dist>340 ? 0.0 : 340-dist)/340),2.0);
+				float increment = 0.025 + Pow(0.25*((dist>340 ? 0.0 : 340-dist)/340),2.0);
+				g_temperature[victim] += increment;
+				// g_temperature[victim] += 0.0165 + Pow(0.185*((dist>340 ? 0.0 : 340-dist)/340),2.0);
 				if(g_temperature[victim] > 1.0) g_temperature[victim] = 1.0;
 			}
 			damagetype &= ~DMG_USEDISTANCEMOD;
@@ -8909,6 +8954,16 @@ public void SetDisguise(int attacker) //set enforcer disguise
 	}
 }
 
+Action ResetPressure(Handle timer, int user)
+{
+	if(IsValidClient(user))
+	{
+		g_meterPri[user] = 100.0;
+		SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
+	}
+	return Plugin_Continue;
+}
+
 Action FlagThink(int flag) //flag logic, detect nearby teammates when dropped and emit ring
 {
 	char[] mapName = new char[64];
@@ -9057,7 +9112,7 @@ Action FlameTouch(int flame, int other) //lingering flamethrower flames
 	int primary = TF2Util_GetPlayerLoadoutEntity(owner, TFWeaponSlot_Primary, true);
 	int primaryIndex = -1;
 	if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-	//index to exclude degreaser
+	//index to exclude degreaser 215
 
 	char class[64];
 	GetEntityClassname(other, class, sizeof(class));
@@ -10057,4 +10112,13 @@ public bool TraceEntityFilterPlayer(int entity, int contentsMask, any data)
 int GetRandomUInt(int min, int max)
 {
 	return RoundToFloor(GetURandomFloat() * (max - min + 1)) + min;
+}
+
+float GetMax(float a, float b)
+{
+	return a > b ? a : b;
+}
+float GetMin(float a, float b)
+{
+	return a < b ? a : b;
 }
