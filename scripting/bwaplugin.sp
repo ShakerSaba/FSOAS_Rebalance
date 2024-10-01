@@ -61,6 +61,7 @@ float g_spyTauntTime[MAXPLAYERS+1];
 float g_critHealReset[MAXPLAYERS+1];
 float g_flameHit[2048];
 float g_flagTime[2048];
+float g_GrenadeTime[2048];
 
 // int CART = -1;
 // float CARTSPEED = 200.0;
@@ -990,23 +991,23 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Backburner
 			case 40,1146:
 			{
-				// TF2Attrib_SetByDefIndex(primary,170,2.0); //airblast cost increased
-				float force = 1.33;
-				if(g_bIsMVM) //mvm force
-				{
-					Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
-					if(addr != Address_Null)
-					{
-						float value = TF2Attrib_GetValue(addr);
-						force *= value;
-					}
-				}
-				TF2Attrib_SetByDefIndex(primary,255,force); //airblast force
+				// TF2Attrib_SetByDefIndex(primary,170,2.5); //airblast cost increased
+				// float force = 1.0;
+				// if(g_bIsMVM) //mvm force
+				// {
+				// 	Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
+				// 	if(addr != Address_Null)
+				// 	{
+				// 		float value = TF2Attrib_GetValue(addr);
+				// 		force *= value;
+				// 	}
+				// }
+				// TF2Attrib_SetByDefIndex(primary,255,force); //airblast force
 			}
 			//Iron Bomber
 			case 1151:
 			{
-				TF2Attrib_SetByDefIndex(primary,1,0.9); //damage penalty
+				// TF2Attrib_SetByDefIndex(primary,1,0.9); //damage penalty
 				TF2Attrib_SetByDefIndex(primary,100,0.7); //blast radius decreased
 				TF2Attrib_SetByDefIndex(primary,787,1.3); //fuse bonus
 			}
@@ -2859,7 +2860,7 @@ public void OnGameFrame()
 								//update force of airblast in increments
 								int force = RoundToNearest(meter);
 								float newMeter = 0.5+meter/200;
-								if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.33;
+								// if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.25; //backburner force
 								if(g_bIsMVM) //mvm force
 								{
 									Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
@@ -4084,7 +4085,7 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 				if(secondary != -1) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
 				if(secondaryIndex==444) //mantreads resistance
 				{
-					CreateTimer(0.25,ResetBlast,iClient);
+					CreateTimer(0.125,ResetBlast,iClient);
 				}
 			}
 			// if(condition==TFCond_Slowed) //mangler charge remove
@@ -4491,7 +4492,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
 								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
 								float newMeter = 0.5+meter/200;
-								if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.33;
+								// if(primaryIndex==40 || primaryIndex==1146) newMeter *= 1.25; //backburner
 								if(g_bIsMVM) //mvm force
 								{
 									Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
@@ -4940,7 +4941,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 											SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
 											EmitSoundToClient(idx, "misc/rd_finale_beep01.wav", idx, _, SNDLEVEL_GUNFIRE, _, SNDVOL_NORMAL, _, _);
 											SetHudTextParams(0.1, -0.16, 3.0, 255, 255, 255, 255);
-											ShowHudText(idx,1,"YOU'RE MARKED!");
+											ShowHudText(idx,1,"⊙ REVEALED!");
 											CreateTimer(5.0,updateGlow,idx);
 										}
 									}
@@ -5546,7 +5547,7 @@ public Action VoiceListener(int iClient, const char[] command, int argc)
 								SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
 								EmitSoundToClient(idx, "misc/rd_finale_beep01.wav", idx, _, SNDLEVEL_GUNFIRE, _, SNDVOL_NORMAL, _, _);
 								SetHudTextParams(0.1, -0.16, 2.0, 255, 255, 255, 255);
-								ShowHudText(idx,1,"YOU'RE MARKED!");
+								ShowHudText(idx,1,"⊙ REVEALED!");
 								CreateTimer(2.0,updateGlow,idx);
 							}
 						}
@@ -5913,6 +5914,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 	if(IsValidClient(victim,false)) tfVictimClass = TF2_GetPlayerClass(victim);
 	int weaponIndex = -1;
 	if(weapon > 0) weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+	PrintToChat(victim,"final: %.2f",damage);
 
 	//explode on ignite for single target
 	if(IsValidClient(victim,false))
@@ -6083,11 +6085,14 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					//set burn on victims if HEAT is active
 					if(g_condFlags[attacker] & TF_CONDFLAG_HEAT && (damagetype & DMG_IGNITE))
 					{
-						float duration = TF2Util_GetPlayerBurnDuration(victim);
-						float dist = getPlayerDistance(attacker,victim); //scale afterburn time with distance,
-						float ignition = dist>256 ? RoundToCeil(8.0*((768-dist)/512))/2.0 : 4.0; //max of 3s and intervals of 0.5s
-						if(duration < ignition && tfVictimClass != TFClass_Pyro)
-							TF2Util_SetPlayerBurnDuration(victim,ignition);
+						if(tfVictimClass!=TFClass_Pyro && !TF2_IsPlayerInCondition(victim,TFCond_DeadRingered))
+						{
+							float duration = TF2Util_GetPlayerBurnDuration(victim);
+							float dist = getPlayerDistance(attacker,victim); //scale afterburn time with distance,
+							float ignition = dist>256 ? RoundToCeil(8.0*((768-dist)/512))/2.0 : 4.0; //max of 3s and intervals of 0.5s
+							if(duration < ignition && tfVictimClass != TFClass_Pyro)
+								TF2Util_SetPlayerBurnDuration(victim,ignition);
+						}
 					}
 				}
 				if(valid | tank)
@@ -6646,6 +6651,15 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			{
 				if(weaponIndex == 307 && damagetype & DMG_BLAST == DMG_BLAST) //caber damage bonus just on explosion
 					damage *= 1.10;
+				if(weaponIndex == 1151) //iron bomber scale damage with time
+				{
+					float diff = GetGameTime() - g_GrenadeTime[inflictor];
+					if(diff>0.5) //only if over half a sec
+					{
+						float scale = diff>2.0 ? 0.75 : 0.75 + ((2.0-diff)/1.5)*0.25;
+						damage *= scale;
+					}
+				}
 			}
 			case TFClass_Scout:
 			{
@@ -7081,16 +7095,34 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				if(damagetype & DMG_IGNITE) //increase fire damage for volcano marked targets
 					damage *= 1.3;
 			}
+
+			if((damagetype & DMG_CRIT == DMG_CRIT) &&
+			   (TF2_IsPlayerInCondition(victim,TFCond_UberBlastResist) && damagetype & DMG_BLAST == DMG_BLAST) ||
+			   (TF2_IsPlayerInCondition(victim,TFCond_UberBulletResist) && (damagetype & DMG_BULLET == DMG_BULLET || damagetype & DMG_BUCKSHOT == DMG_BUCKSHOT)) ||
+			   (TF2_IsPlayerInCondition(victim,TFCond_UberFireResist) && damagetype & DMG_IGNITE == DMG_IGNITE))
+			{
+				//Vaccinator crit damage modifier
+				float multiplier = 1.0;
+				if((isKritzed(attacker) && weaponIndex!=441) || weaponIndex==355 || weaponIndex==232)
+				{
+					multiplier = 1.275;
+				}
+				else if(isMiniKritzed(attacker,victim) || weaponIndex==441)
+				{
+					multiplier = 1.125;
+				}
+				damage *= multiplier; //add to damage
+			}
 		}
 	}
 
-	if(!(damagetype & DMG_BURN))
-	{
-		// PrintToChat(attacker,"%d->%d %.2f",attacker,victim,GetGameTime());
-		// PrintToChatAll("%.2f %d %d %d %d %d",damage,victim,attacker,weapon,inflictor,damagetype);
-		// PrintToChatAll("%.2f %.2f %.2f | %.2f %.2f %.2f",damageForce[0],damageForce[1],damageForce[2],damagePosition[0],damagePosition[1],damagePosition[2]);
-		// if(IsValidClient(attacker)) PrintToChat(attacker,"%d->%d %.2f",attacker,victim,getPlayerDistance(attacker,victim));
-	}
+	// if(!(damagetype & DMG_BURN))
+	// {
+	// 	PrintToChat(attacker,"%d->%d %.2f",attacker,victim,GetGameTime());
+	// 	PrintToChatAll("%.2f %d %d %d %d %d",damage,victim,attacker,weapon,inflictor,damagetype);
+	// 	PrintToChatAll("%.2f %.2f %.2f | %.2f %.2f %.2f",damageForce[0],damageForce[1],damageForce[2],damagePosition[0],damagePosition[1],damagePosition[2]);
+	// 	if(IsValidClient(attacker)) PrintToChat(attacker,"%d->%d %.2f",attacker,victim,getPlayerDistance(attacker,victim));
+	// }
 	return Plugin_Changed;
 }
 
@@ -8464,11 +8496,11 @@ public void Phlog_SecondaryAttack(int entity,int client,float angles[3],float ve
 				}
 				if(healing>0) TF2Util_TakeHealth(client,20.0*healing);
 
-				//self-knockback
-				if((vel!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
-				{
-					AirblastPush(client);
-				}
+				// //self-knockback
+				// if((vel!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
+				// {
+				// 	AirblastPush(client);
+				// }
 			}
 			else
 			{
@@ -8917,7 +8949,11 @@ public void VolcanoBurst(DataPack pack)
 
 		SDKHooks_TakeDamage(victim, attacker, attacker, 18.0, DMG_IGNITE | DMG_BURN, burnerMelee, NULL_VECTOR, targetPos, false);
 		g_condFlags[victim] |= TF_CONDFLAG_VOLCANO;
-		if(TF2_GetPlayerClass(victim) == TFClass_Pyro) TF2_AddCondition(victim,TFCond_BurningPyro,8.0);
+		if(TF2_GetPlayerClass(victim) == TFClass_Pyro)
+		{
+			TF2_AddCondition(victim,TFCond_BurningPyro,8.0);
+			TF2Util_SetPlayerBurnDuration(victim,8.0);
+		}
 	}
 }
 
@@ -9627,11 +9663,11 @@ void AirblastPush(int client)
 	float meter = GetEntPropFloat(client, Prop_Send, "m_flItemChargeMeter", 0);
 	if(primaryIndex == 1178) meter = g_meterPri[client];
 	meter *= PRESSURE_FORCE;
-	if (primaryIndex==40||primaryIndex==1146)
+	if (primaryIndex==40||primaryIndex==1146) //backburner force
 	{
-		meter *= 1.33;
+		meter *= 1.25;
 	}
-	else if(primaryIndex==594)
+	else if(primaryIndex==594) //phlogistinator "force"
 	{
 		meter *= 0.00;
 	}
@@ -9744,6 +9780,33 @@ void orbSpawn(int entity)
 void PipeSpawn(int grenade)
 {
 	g_Grenades[grenade] = 0;
+	g_GrenadeTime[grenade] = GetGameTime();
+	CreateTimer(0.5,PipeBeep,grenade);
+}
+public Action PipeBeep(Handle timer, int grenade)
+{
+	if(IsValidEdict(grenade))
+	{
+		char class[64];
+		GetEntityClassname(grenade, class, sizeof(class));
+		if(StrEqual(class,"tf_projectile_pipe"))
+		{
+			int weapon = GetEntPropEnt(grenade, Prop_Send, "m_hLauncher");
+			int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
+			int wepIndex = -1;
+			if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+			
+			if(wepIndex == 1151)
+			{
+				int team = GetEntProp(owner, Prop_Data, "m_iTeamNum");
+				if(team == 3)
+					CreateParticle(grenade,"drg_cow_explosion_flashup_blue",1.0,_,_,_,_,_,_,false,false);
+				else if(team == 2)
+					CreateParticle(grenade,"drg_cow_explosion_flashup",1.0,_,_,_,_,_,_,false,false);
+			}
+		}
+	}
+	return Plugin_Changed;
 }
 
 Action PipeSet(int grenade)
@@ -9934,7 +9997,7 @@ public Action KillNeighbor(Handle timer, int neighbor)
 				Handle hndl = TR_TraceRayFilterEx(pos2, vicPos, MASK_SOLID, RayType_EndPoint, PlayerTraceFilter, neighbor);
 				if(TR_DidHit(hndl) == false || IsValidClient(TR_GetEntityIndex(hndl),false))
 				{
-					float damage = 55 - 25*(dist/126);
+					float damage = 60 - 30*(dist/148);
 					if(g_bIsMVM) //mvm damage
 					{
 						Address addr = TF2Attrib_GetByName(weapon, "damage bonus");
@@ -9958,7 +10021,7 @@ public Action KillNeighbor(Handle timer, int neighbor)
 							type |= DMG_CRIT;
 						}
 					}
-					SDKHooks_TakeDamage(j, owner, owner, damage, type, weapon, NULL_VECTOR, pos2, false);
+					SDKHooks_TakeDamage(j, neighbor, owner, damage, type, weapon, NULL_VECTOR, pos2, false);
 				}
 				delete hndl;
 			}
