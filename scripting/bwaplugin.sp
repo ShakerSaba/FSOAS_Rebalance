@@ -871,7 +871,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//The Back Scatter
 			case 1103:
 			{
-				TF2Attrib_SetByDefIndex(primary,6,0.9); //firing speed bonus
+				// TF2Attrib_SetByDefIndex(primary,6,0.9); //firing speed bonus
 			}
 			//The Shortstop
 			case 220:
