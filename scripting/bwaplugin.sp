@@ -637,7 +637,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						if(primaryIndex == 752) TF2Attrib_SetByDefIndex(primary,51,0.0);
 					}
 					//set clip and reserve
-					TF2Attrib_SetByDefIndex(primary,303,4.0); //set clip ammo
 					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 					int clip = 5; //default clip size
 					switch(primaryIndex)
@@ -656,6 +655,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 							clip = RoundFloat(clip * value);
 						}
 					}
+					TF2Attrib_SetByDefIndex(primary,303,clip+0.0); //set clip ammo
 					SetEntData(primary, iAmmoTable, clip, 4, true);
 					SetEntProp(primary, Prop_Send, "m_iClip1",clip);
 					int reserve = 15;
@@ -3432,12 +3432,12 @@ public void OnGameFrame()
 					case TFClass_Sniper:
 					{
 						//sniper rifle reload
+						int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
+						int reload = GetEntProp(primary, Prop_Send, "m_iReloadMode");
+						int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
+						float cycle = GetEntPropFloat(view, Prop_Data, "m_flCycle");
 						if(primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092)
 						{
-							int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
-							int reload = GetEntProp(primary, Prop_Send, "m_iReloadMode");
-							int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
-							float cycle = GetEntPropFloat(view, Prop_Data, "m_flCycle");
 							if(sequence==29 || sequence==28) //in case of last shot in clip, allows for auto-reload
 							{
 								if (cycle>=1.0) SetEntProp(view, Prop_Send, "m_nSequence",30);
@@ -3485,9 +3485,11 @@ public void OnGameFrame()
 									if(g_meterPri[iClient]/reloadSpeed>0.1)
 									{
 										EmitAmbientSound("weapons/widow_maker_pump_action_forward.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+										reload = 2;
 										SetEntProp(primary, Prop_Send, "m_iReloadMode",2);
 									}
-								}else if(reload==2)
+								}
+								else if(reload==2)
 								{
 									if(sequence!=relSeq) SetEntProp(view, Prop_Send, "m_nSequence",relSeq);
 									SetEntPropFloat(view, Prop_Data, "m_flCycle",g_meterPri[iClient]); //1004
@@ -3495,9 +3497,11 @@ public void OnGameFrame()
 									if(g_meterPri[iClient]/reloadSpeed>0.4)
 									{
 										EmitAmbientSound("weapons/revolver_reload_cylinder_arm.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+										reload = 3;
 										SetEntProp(primary, Prop_Send, "m_iReloadMode",3);
 									}
-								}else if(reload==3)
+								}
+								else if(reload==3)
 								{
 									if(sequence!=relSeq) SetEntProp(view, Prop_Send, "m_nSequence",relSeq);
 									SetEntPropFloat(view, Prop_Data, "m_flCycle",g_meterPri[iClient]); //1004
@@ -3505,6 +3509,7 @@ public void OnGameFrame()
 									if(g_meterPri[iClient]/reloadSpeed>0.8)
 									{
 										EmitAmbientSound("weapons/widow_maker_pump_action_back.wav",clientPos,iClient,SNDLEVEL_TRAIN,_,0.4);
+										reload = 4;
 										SetEntProp(primary, Prop_Send, "m_iReloadMode",4);
 									}
 								}
@@ -3516,17 +3521,21 @@ public void OnGameFrame()
 						{
 							case 1098: //set classic headshots
 							{
-								float charge = GetEntPropFloat(primary, Prop_Send, "m_flChargedDamage");
-								if(g_meterPri[iClient]!=1.0 && charge == 0.0)
+								PrintToChat(iClient,"%d %.2f",reload,g_meterPri[iClient]);
+								if(reload==0)
 								{
-									TF2Attrib_SetByDefIndex(primary,306,1.0); //headshots only at full charge
-									g_meterPri[iClient]=1.0;
-								}
-								if(g_meterPri[iClient]==1.0 && charge>=75)
-								{
-									EmitSoundToClient(iClient,"weapons/sniper_bolt_forward.wav");
-									TF2Attrib_SetByDefIndex(primary,306,0.0); //headshots only at full charge
-									g_meterPri[iClient]=2.0;
+									float charge = GetEntPropFloat(primary, Prop_Send, "m_flChargedDamage");
+									if(g_meterPri[iClient]!=1.0 && charge == 0.0)
+									{
+										TF2Attrib_SetByDefIndex(primary,306,1.0); //headshots only at full charge
+										g_meterPri[iClient]=1.0;
+									}
+									if(g_meterPri[iClient]==1.0 && charge>=75)
+									{
+										EmitSoundToClient(iClient,"weapons/sniper_bolt_forward.wav");
+										TF2Attrib_SetByDefIndex(primary,306,0.0); //headshots only at full charge
+										g_meterPri[iClient]=2.0;
+									}
 								}
 							}
 							case 526,30665: //machina damage number
