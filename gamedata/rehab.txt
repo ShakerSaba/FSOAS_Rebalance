@@ -1,0 +1,39 @@
+"Games"
+{
+	"tf"
+	{
+		"Offsets"
+		{
+			"CBaseObject::StartBuilding"
+			{
+				"windows"       "342"
+				"linux"         "344"
+			}
+			"CBaseObject::FinishedBuilding"
+			{
+				"windows"       "343"
+				"linux"         "345"
+			}
+			"CBaseObject::StartUpgrading"
+			{
+				"windows"       "383"
+				"linux"         "384"
+			}
+			"CBaseObject::FinishUpgrading"
+			{
+				"windows"       "384"
+				"linux"         "385"
+			}
+			"Weapon_ShootPosition"
+			{
+				"windows" "275"
+				"linux" "276"
+			}
+			"CTFGrenadePipebombProjectile::Detonate"
+			{
+				"windows" "236"
+				"linux" "237"
+			}
+		}
+	}
+}
