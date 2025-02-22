@@ -42,7 +42,6 @@ int g_spawnPumpkin[MAXPLAYERS+1];
 int g_spyTaunt[MAXPLAYERS+1];
 int g_engyDispenser[MAXPLAYERS+1];
 int g_Flames[MAXPLAYERS+1];
-int airBlast[MAXPLAYERS+1][3];
 int g_bisonHit[2048];
 int g_Grenades[2048];
 int g_flagHelpers[2048];
@@ -75,7 +74,9 @@ float IRON_DETECT = 80.0;
 float PARACHUTE_TIME = 6.0;
 float FIRE_TIME = 4.0;
 float HAND_MAX = 10.0;
-float PRESSURE_FORCE = 2.5;
+float PRESSURE_TIME = 8.0;
+float PRESSURE_FORCE = 2.25;
+float PRESSURE_COST = 33.33;
 float HYPE_COST = 29.5;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
@@ -337,13 +338,19 @@ public void OnMapStart()
 	PrecacheSound("vo/taunts/demo/taunt_demo_exert_06.mp3",true);
 	PrecacheSound("vo/taunts/demo/taunt_demo_exert_08.mp3",true);
 	PrecacheSound("vo/taunts/demo/taunt_demo_flip_exert_03.mp3",true);
-	PrecacheSound("weapons/cow_mangler_main_shot.wav",true);
-	PrecacheSound("weapons/flame_thrower_airblast.wav",true);
-	PrecacheSound("player/pl_impact_airblast1.wav",true);
-	PrecacheSound("player/pl_impact_airblast2.wav",true);
-	PrecacheSound("player/pl_impact_airblast3.wav",true);
-	PrecacheSound("player/pl_impact_airblast4.wav",true);
 	PrecacheSound("weapons/stickybomblauncher_charge_up.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_01.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_02.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_03.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_04.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_05.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_normal_06.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_01.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_02.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_03.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_04.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_05.wav",true);
+	PrecacheSound("weapons/cow_mangler_explosion_charge_06.wav",true);
 	PrecacheSound("vo/taunts/soldier/soldier_taunt_flip_fun_04.mp3",true); //TODO execute when diving
 	PrecacheSound("vo/soldier_painsharp01.mp3",true); //TODO execute when landing
 	PrecacheSound("vo/soldier_painsharp02.mp3",true);
@@ -456,6 +463,10 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 			SDKHook(iEnt, SDKHook_SpawnPost, FlameSpawn);
 			SDKHook(iEnt, SDKHook_Touch, FlameTouch);
 		}
+		// else if(StrEqual(classname,"tf_projectile_balloffire"))
+		// {
+		// 	SDKHook(iEnt, SDKHook_Touch, FireTouch);
+		// }
 		else if(StrEqual(classname,"tf_projectile_pipe"))
 		{
 			SDKHook(iEnt, SDKHook_SpawnPost, PipeSpawn);
@@ -547,7 +558,7 @@ public Action LogGameMessage(const char[] message)
 		strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
 		id[idEndPos-idStartPos] = 0;
 		int user = GetClientOfUserId(StringToInt(id));
-		//refund pressure on extinguish
+		//refund airblast pressure on extinguish
 		CreateTimer(0.06,ResetPressure,user);
 	}
 	return Plugin_Continue;
@@ -689,10 +700,10 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			}
 			case TFClass_Pyro: 
 			{
-				//modify pyro airblast
+				// modify pyro airblast
 				if(primaryIndex!=594) //ignore phlog
 				{
-					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 0);
+					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
 					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 10);
 					float force = 1.0;
 					if(g_bIsMVM) //mvm force
@@ -704,7 +715,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 							force *= value;
 						}
 					}
-					TF2Attrib_SetByDefIndex(primary,255,force); //airblast force
+					TF2Attrib_SetByDefIndex(primary,164,force); //airblast force
 				}
 			}
 			case TFClass_Spy:
@@ -1004,8 +1015,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			//Cow Mangler 5000
 			case 441:
 			{
-				// TF2Attrib_SetByDefIndex(primary,335,0.75); //clip size upgrade
-				// SetEntPropFloat(primary, Prop_Send, "m_flEnergy",15.0);
+				//
 			}
 			//Soda Popper
 			case 448:
@@ -1016,6 +1026,21 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 1178:
 			{
 				g_meterPri[iClient]=100.0;
+			}
+			//Iron Curtain
+			case 298:
+			{
+				TF2Attrib_SetByDefIndex(primary,350,1.0); //ragdolls become ash
+				TF2Attrib_SetByDefIndex(primary,106,0.001); //spread bonus
+				TF2Attrib_SetByDefIndex(primary,809,1.0); //fixed_shot_pattern
+				TF2Attrib_SetByDefIndex(primary,5,10.0); //firing speed bonus
+				TF2Attrib_SetByDefIndex(primary,305,1.0); //sniper fires tracer
+				TF2Attrib_SetByDefIndex(primary,2,8.0); //damage bonus
+				TF2Attrib_SetByDefIndex(primary,45,0.25); //bullets per shot bonus
+				TF2Attrib_SetByDefIndex(primary,77,0.2); //maxammo primary reduced
+				TF2Attrib_SetByDefIndex(primary,266,1.0); //projectile penetration
+				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+				SetEntProp(iClient, Prop_Data, "m_iAmmo", 40, _, primaryAmmo);
 			}
 		}
 
@@ -2344,6 +2369,20 @@ public Action Event_RoundWin(Event event, const char[] cName, bool dontBroadcast
 
 public void OnGameFrame()
 {
+	//modify spookiness 
+	ConVar holiday = FindConVar("tf_forced_holiday");
+	switch(holiday.IntValue)
+	{
+		case 2: IS_HALLOWEEN=true;
+		default:
+		{
+			char[] mapName = new char[64];
+			GetCurrentMap(mapName,64);
+			if(!IsHalloweenMap(mapName))
+				IS_HALLOWEEN=false;
+		}
+	}
+	
 	for (int i = 1; i <= MaxClients; i++)
 	{
 		int iClient = i;
@@ -2672,10 +2711,8 @@ public void OnGameFrame()
 										}
 									}
 								}
-								else //check in case of speed and charge level not being reset
+								else //check charge level not being reset
 								{
-									if(GetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed")<240)
-										SetEntPropFloat(iClient, Prop_Send, "m_flMaxspeed",240.0);
 									if(g_meterPri[iClient]>0)
 										g_meterPri[iClient] = 0.0;
 								}
@@ -2730,50 +2767,54 @@ public void OnGameFrame()
 						{
 							float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
 							if(primaryIndex == 1178) meter = g_meterPri[iClient];
-							// float nextAttack = GetEntPropFloat(primary, Prop_Send, "m_flLastFireTime");
-							// int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
-							
-							if(current==primary)
-							{
-								SetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime()+0.45);
-							}
-							if(meter<0)
-							{
-								float interval = primaryIndex == 1178 ? 0.0075 : 0.015;
-								if(primaryIndex == 1178) g_meterPri[iClient] = meter+interval > 0 ? 0.0 : meter+interval;
-								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+interval > 0 ? 0.0 : meter+interval, 0);
-							}
-							else if(meter>2.1)
-							{
-								if(primaryIndex == 1178) g_meterPri[iClient] = -0.75;
-								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", -0.75, 0);
-							}
-							else if(meter>0)
-							{
-								if(primaryIndex==1178) SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+1.45);
-								else SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.75);
-							}
 
-							//HUD for meter
-							if(meter>=0)
+							float nextAttack = GetEntPropFloat(primary, Prop_Send, "m_flLastFireTime");
+							int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+							if(weaponState!=2 && weaponState!=3 && nextAttack-0.15<GetGameTime()) //out of airblast
 							{
-								if(meter>1.2)
+								//update pressure meter
+								float increment = 100.0/(66*PRESSURE_TIME);
+								if(g_bIsMVM)
 								{
-									SetHudTextParams(-0.1, -0.16, 0.5, 255, RoundFloat(255*((2.1-meter)/2.1)), RoundFloat(255*((2.1-meter)/2.1)), 255);
-									ShowHudText(iClient,2,"MAX PRESSURE");
+									Address addr = TF2Attrib_GetByName(primary, "mult airblast refire time");
+									if(primaryIndex == 1178) addr = TF2Attrib_GetByName(primary, "fire rate bonus");
+									if(addr != Address_Null)
+									{
+										float value = TF2Attrib_GetValue(addr);
+										increment /= value;
+									}
+								}
+								if(primaryIndex==40 || primaryIndex==1146) increment *= 0.67; //backburner slower recharge
+								else if(primaryIndex==215) increment *= 1.5; //degreaser faster recharge
+								
+								if(primaryIndex != 1178)
+								{
+									if(meter<100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+increment, 0);
+									else if(meter>100.0) SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
 								}
 								else
 								{
-									SetHudTextParams(-0.1, -0.16, 0.5, 255, 255, 255, 255);
-									ShowHudText(iClient,2,"%.0f%% PRESSURE",meter*100/1.2);
+									float rate = GetEntPropFloat(primary, Prop_Send, "m_flRechargeScale");
+									increment *= rate; //increase rate based on re-pressurization
+									if(meter<100.0) g_meterPri[iClient] = meter+increment;
+									else if(meter>100.0) g_meterPri[iClient] = 100.0;
 								}
+								//update force of airblast in increments
+								int force = RoundToNearest(meter);
+								float newMeter = meter/100;
+								if(g_bIsMVM) //mvm force
+								{
+									Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
+									if(addr != Address_Null)
+									{
+										float value = TF2Attrib_GetValue(addr);
+										newMeter *= value;
+									}
+								}
+								if(force % 5 == 0) TF2Attrib_SetByDefIndex(primary,255,newMeter); //set next airblast force
 							}
-							else
-							{
-								SetHudTextParams(-0.1, -0.16, 0.5, 255, 255, 255, 255);	
-								ShowHudText(iClient,2,"%.0f%% RECHARGE",100-(meter*-100/0.75));
-							}
-							
+							SetHudTextParams(-0.1, -0.16, 0.5, 255, 255, 255, 255);
+							ShowHudText(iClient,2,"%.0f%% PRESSURE",meter);
 						}
 						if(primaryIndex==1178) //dragon's fury mvm fire rate
 						{
@@ -3045,6 +3086,19 @@ public void OnGameFrame()
 												}
 											}
 										}
+									}
+								}
+							}
+							case 298: //Iron Curtain
+							{
+								int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+								if(weaponState==3)
+								{
+									float diff = GetGameTime()-g_meterPri[iClient]-0.87;
+									if(diff>=0)
+									{
+										SetHudTextParams(-1.0, -0.4, 0.1, 255, 255, 255, 255);
+										ShowHudText(iClient,2,"%.0f%% CHARGE",(diff > 4.0 ? 4.0 : diff)*100/4.0);
 									}
 								}
 							}
@@ -3439,23 +3493,23 @@ public void OnGameFrame()
 						if(primaryIndex==230 || (g_bIsMVM && primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092)) //speed up sleeper rezoom
 						{
 							int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+							float nextAtk = GetEntPropFloat(primary, Prop_Data, "m_flNextPrimaryAttack");
 							int clip = GetEntData(primary, iAmmoTable, 4);
-							float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1);
+							float rezoom = GetEntPropFloat(primary, Prop_Data, "m_flRezoomTime");
 							if(reload==0 && clip>0)
 							{
-								float rezoom = GetEntPropFloat(primary, Prop_Data, "m_flRezoomTime");
-								if(meter>2.0 && rezoom!=-1.0)
+								if(rezoom != -1 && GetGameTime() < nextAtk)
 								{
-									SetEntPropFloat(primary, Prop_Data, "m_flRezoomTime", meter);
-									SetEntDataFloat(primary,2084,meter,true);
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
+									SetEntPropFloat(primary, Prop_Data, "m_flRezoomTime", nextAtk);
 								}
-								//for non-auto rezoom
-								if(!TF2_IsPlayerInCondition(iClient,TFCond_Slowed))
+								else
 								{
-									if(GetEntPropFloat(primary, Prop_Data, "m_flNextSecondaryAttack") > GetEntPropFloat(primary, Prop_Data, "m_flNextPrimaryAttack"))
+									if(!TF2_IsPlayerInCondition(iClient,TFCond_Slowed))
 									{
-										SetEntPropFloat(primary, Prop_Data, "m_flNextSecondaryAttack",GetEntPropFloat(primary, Prop_Data, "m_flNextPrimaryAttack"));
+										if(GetEntPropFloat(primary, Prop_Data, "m_flNextSecondaryAttack") > GetEntPropFloat(primary, Prop_Data, "m_flNextPrimaryAttack"))
+										{
+											SetEntPropFloat(primary, Prop_Data, "m_flNextSecondaryAttack",GetEntPropFloat(primary, Prop_Data, "m_flNextPrimaryAttack"));
+										}
 									}
 								}
 							}
@@ -4135,24 +4189,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						}
 					}
 					else
-					{
-						if(primaryIndex==230 || (g_bIsMVM && primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092)) //speed up sleeper rezoom
-						{
-							float value = 1.0;
-							Address addr = TF2Attrib_GetByName(primary, "fire rate bonus");
-							if(addr != Address_Null)
-							{
-								value = TF2Attrib_GetValue(addr);
-							}
-							float time = GetEntPropFloat(primary, Prop_Send, "m_flLastFireTime");
-							float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1);
-							if(GetGameTime() <= time+0.03 && meter < GetGameTime())
-							{
-								meter = time+(1.5*value);
-								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 1);
-							}
-						}
-						
+					{						
 						//fire sniper without ammo
 						if(primaryIndex==1098)
 						{
@@ -4254,151 +4291,41 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					}
 					else //handle airblast
 					{
-						int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
 						float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0);
 						if(primaryIndex == 1178) meter = g_meterPri[iClient];
-						
-						if(buttons & IN_ATTACK == IN_ATTACK)
-							SetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime()+0.45);
-						if(meter>=0)
+						float meter2 = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 10);
+						int weaponState = GetEntProp(primary, Prop_Send, "m_iWeaponState");
+						if(weaponState==3) //in-airblast
 						{
-							int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-							int ammo = GetEntProp(iClient, Prop_Data, "m_iAmmo", _, primaryAmmo);
-							int cost = 20;
-							switch(primaryIndex)
+							if((meter2<meter)) //done to make limit it to first frame in this state
 							{
-								case 40,1146: //backburner cost
-									cost = 50;
-								case 215: //degreaser cost
-									cost = 25;
-								case 1178: //dragon's fury
-									cost = 5;
-							}
-							//hold for charge
-							if(buttons & IN_ATTACK2 == IN_ATTACK2 && (g_LastButtons[iClient] & IN_ATTACK2 != IN_ATTACK2 || meter>0) && ammo >= cost)
-							{
-								if(meter==0.0)
+								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
 								{
-									if(primaryIndex == 1178) g_meterPri[iClient] = 0.015;
-									else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.015, 0);
-									TF2Attrib_SetByDefIndex(primary,255,0.0); //reset airblast force
-									EmitSoundToClient(iClient,"weapons/stickybomblauncher_charge_up.wav",iClient,SNDCHAN_VOICE_BASE);
+									AirblastPush(iClient,meter);
+									meter = 0.0;
 								}
-								float interval = 0.015;
-								if(meter>1.2) //while under 100%, scale charge, so overload time is the same
-								switch(primaryIndex)
-								{
-									case 40,1146: //backburner recharge
-										interval *= 0.67;
-									case 215: //degreaser recharge
-										interval *= 1.25;
-								}
-								if(primaryIndex == 1178) g_meterPri[iClient] += interval;
-								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter+interval, 0);
-								weapon = 0; //prevent switching
-								SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.45); //prevent shooting
-							}
-							//release and scale pressure, handle self-push
-							if(g_LastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2 && (!(buttons & IN_ATTACK2 == IN_ATTACK2) || meter >= 2.0) && meter < 2.1 && meter!=0.0)
-							{
-								//fire airblast and scale force
-								SetEntProp(view, Prop_Send, "m_nSequence",13);
-								float val = meter <= 1.2 ? meter : 1.2;
-								float force = val/1.2;
-								if(primaryIndex==40 || primaryIndex==1146)
-									TF2Attrib_SetByDefIndex(primary,255,1.25*(val/1.2)); //airblast force
+								else
+									meter -= PRESSURE_COST;
+								if(meter<0.0) meter = 0.0;
+								
+								SetEntPropFloat(primary, Prop_Send, "m_flLastFireTime",GetGameTime()+0.75);
+								//update pressure meter
+								if(primaryIndex == 1178) g_meterPri[iClient] = meter;
+								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 0);
+								SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter, 10);
+
+								float newMeter = meter/100;
 								if(g_bIsMVM) //mvm force
 								{
 									Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
 									if(addr != Address_Null)
 									{
 										float value = TF2Attrib_GetValue(addr);
-										force *= value;
+										newMeter *= value;
 									}
 								}
-								TF2Attrib_SetByDefIndex(primary,255,force); //airblast force
-								EmitSoundToClient(iClient,"weapons/flame_thrower_airblast.wav",iClient,SNDCHAN_VOICE_BASE,_,_,0.33);
-								EmitAmbientSound("weapons/flame_thrower_airblast.wav",position,iClient);
-								SetAnimation(iClient,"AttackStand_PRIMARY_ALT",2,1);
-								SetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime());
-								if(primaryIndex==1178) SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+1.45);
-								else SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.7);
-
-								if((vel[2]!=0.0 || !(clientFlags & FL_ONGROUND) || buttons & IN_JUMP))
-								{
-									AirblastPush(iClient,val); //self airblast force
-								}
-								buttons |= IN_ATTACK2;
-								if(primaryIndex == 1178) g_meterPri[iClient] = -0.75;
-								else SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", -0.75, 0);
-								SetEntProp(primary, Prop_Send, "m_iWeaponState", 3);
-
-								//airblast overcharge
-								if(meter>=2.0)
-								{
-									int rndact = GetRandomUInt(0,3);
-									switch(rndact)
-									{
-										case 0: EmitAmbientSound("player/pl_impact_airblast1.wav",position,iClient);
-										case 1: EmitAmbientSound("player/pl_impact_airblast2.wav",position,iClient);
-										case 2: EmitAmbientSound("player/pl_impact_airblast3.wav",position,iClient);
-										case 3: EmitAmbientSound("player/pl_impact_airblast4.wav",position,iClient);
-									}
-									SDKHooks_TakeDamage(iClient, iClient, iClient, 30.0, DMG_BLAST, primary);
-								}
-
-								//Create AirBlast Particle
-								int particle  = CreateEntityByName("info_particle_system");
-								int particle2 = CreateEntityByName("info_particle_system");
-								int controlpoint1 = iClient;
-								int controlpoint2 = primary;
-								if (IsValidEdict(particle))
-								{
-									char tName[128];
-									Format(tName, sizeof(tName), "target%i", controlpoint1);
-									DispatchKeyValue(controlpoint1, "targetname", tName);
-									char cpName[128];
-									Format(cpName, sizeof(cpName), "target%i", controlpoint2);
-									DispatchKeyValue(controlpoint2, "targetname", cpName);
-									//--------------------------------------
-									char cp2Name[128];
-									Format(cp2Name, sizeof(cp2Name), "tf2particle%i", controlpoint2);
-									DispatchKeyValue(particle2, "targetname", cp2Name);
-									DispatchKeyValue(particle2, "parentname", cpName);
-									SetVariantString(cpName);
-									AcceptEntityInput(particle2, "SetParent");
-									SetVariantString("flag");
-									AcceptEntityInput(particle2, "SetParentAttachment");
-									//-----------------------------------------------
-									DispatchKeyValue(particle, "targetname", "tf2particle");
-									DispatchKeyValue(particle, "parentname", tName);
-									DispatchKeyValue(particle, "effect_name", "pyro_blast");
-									DispatchKeyValue(particle, "cpoint1", cp2Name);
-									DispatchKeyValueInt(particle, "cpoint1_parent", controlpoint1);
-
-									DispatchSpawn(particle);
-									SetVariantString(tName);
-									AcceptEntityInput(particle, "SetParent");
-									SetVariantString("flag");
-									AcceptEntityInput(particle, "SetParentAttachment");
-									//The particle is finally ready
-									ActivateEntity(particle);
-									AcceptEntityInput(particle, "start");
-									//--------------------------------------
-									float pos[3],ang[3],viewAng[3];
-									GetClientEyeAngles(iClient,viewAng);
-									ang[0] = 45.0;
-									ang[1] = viewAng[0]-30;
-									pos[0] = 100.0 - 65 * ((90-FloatAbs(viewAng[0]))/90);
-									pos[1] = -20.0 + 30 * (viewAng[0]/90);
-									pos[2] = -100.0 + 65 * ((90-FloatAbs(viewAng[0]))/90);
-									
-									TeleportEntity(particle,pos,ang,_);
-									airBlast[iClient][0] = particle;
-									airBlast[iClient][1] = particle2;
-									CreateTimer(2.0, DeleteParticle, particle);
-									CreateTimer(2.0, DeleteParticle, particle2);
-								}
+								TF2Attrib_SetByDefIndex(primary,255,newMeter); //set next airblast force
+								// RequestFrame(CheckReflect,iClient);
 							}
 						}
 					}
@@ -4486,6 +4413,69 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						{
 							SetEntPropFloat(secondary, Prop_Send, "m_flNextPrimaryAttack",time+0.5);
 							SetEntPropFloat(primary, Prop_Send, "m_flTimeWeaponIdle",time+idle);
+						}
+					}
+
+					//Iron Curtain
+					if(primaryIndex==298)
+					{
+						if(weaponState==0)
+						{
+							g_meterPri[iClient] = time;
+						}
+						if(weaponState==2 && time-g_meterPri[iClient]>0.88)
+						{
+							float diff = time-g_meterPri[iClient]-0.88;
+							float power = 8.0 + (diff > 4.0 ? 4.0 : diff)*2.0;
+							if(diff<1.0) power *= (2-diff);
+							TF2Attrib_SetByDefIndex(primary,2,power); //damage bonus
+							if(g_condFlags[iClient] & TF_CONDFLAG_HEATER == TF_CONDFLAG_HEATER && !(g_condFlags[iClient] & TF_CONDFLAG_FAKE == TF_CONDFLAG_FAKE))
+							{
+								RequestFrame(IronFire,iClient);
+								buttons &= ~IN_ATTACK;
+								buttons &= ~IN_ATTACK2;
+								g_condFlags[iClient] |= TF_CONDFLAG_FAKE;
+							}
+							else
+							{
+								g_condFlags[iClient] |= TF_CONDFLAG_HEATER;
+								int rndact = GetRandomUInt(0,5);
+								char sound[64];
+								if(diff>4)
+								{
+									switch(rndact)
+									{
+										case 0: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_01.wav");
+										case 1: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_02.wav");
+										case 2: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_03.wav");
+										case 3: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_04.wav");
+										case 4: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_05.wav");
+										case 5: strcopy(sound, 64, "weapons/cow_mangler_explosion_charge_06.wav");
+									}
+								}
+								else
+								{
+									switch(rndact)
+									{
+										case 0: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_01.wav");
+										case 1: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_02.wav");
+										case 2: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_03.wav");
+										case 3: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_04.wav");
+										case 4: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_05.wav");
+										case 5: strcopy(sound, 64, "weapons/cow_mangler_explosion_normal_06.wav");
+									}
+								}
+								for(int idx = 1; idx < MaxClients; idx++)
+								{
+									if(IsValidClient(idx))
+									{
+										//play sound
+										float dist = getPlayerDistance(idx,iClient);
+										dist = dist > 2500 ? 3000.0 : (dist < 512 ? 512.0 : dist);
+										EmitSoundToClient(idx, sound, iClient, SNDCHAN_WEAPON, SNDLEVEL_GUNFIRE, _, 1.2-(dist/2500), _, _);
+									}
+								}
+							}
 						}
 					}
 				}
@@ -4914,7 +4904,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						g_meterSec[iClient] = clip+0.0;
 						if(buttons & IN_ATTACK != IN_ATTACK) EmitSoundToClient(iClient,"weapons/tf2_backshot_shotty.wav");
 					}
-					else if (g_meterPri[iClient]>clip)
+					else if (primaryIndex == 1153 && g_meterPri[iClient]>clip)
 					{
 						g_meterPri[iClient] = clip+0.0;
 						if(buttons & IN_ATTACK != IN_ATTACK) EmitSoundToClient(iClient,"weapons/tf2_backshot_shotty.wav");
@@ -4938,7 +4928,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						int clip = GetEntData(wep, iAmmoTable, 4);
 						if (secondaryIndex == 1153)
 							g_meterSec[iClient] = clip+0.0;
-						else
+						else if(primaryIndex == 1153)
 							g_meterPri[iClient] = clip+0.0;
 						TF2Attrib_SetByDefIndex(wep,348,0.67);
 						TF2Attrib_SetByDefIndex(wep,808,1.0);
@@ -7059,7 +7049,6 @@ public Action Event_PickUpHealth(int entity, int other)
 {
 	if(IsValidClient(other))
 	{
-		int MaxHP = GetEntProp(GetPlayerResourceEntity(), Prop_Send, "m_iMaxHealth", _, other);
 		char class[64];
 		GetEntityClassname(entity, class, sizeof(class));
 		int melee = TF2Util_GetPlayerLoadoutEntity(other, TFWeaponSlot_Melee, true);
@@ -7085,15 +7074,6 @@ public Action Event_PickUpHealth(int entity, int other)
 					TF2Util_TakeHealth(other,10.0);
 				}
 			}
-		}
-		//block steak recharge
-		int secondary = TF2Util_GetPlayerLoadoutEntity(other, TFWeaponSlot_Secondary, true);
-		int secondaryIndex = -1;
-		if(secondary >= 0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-		if (311 == secondaryIndex)
-		{
-			if(GetClientHealth(other)>=MaxHP)
-				return Plugin_Handled;
 		}
 	}
 	return Plugin_Continue;
@@ -7590,7 +7570,7 @@ public Action UpdateParticle(Handle timer, DataPack pack)
 									{
 										GetEntPropVector(particle, Prop_Send, "m_vecOrigin", flamepos);
 										float distance = GetVectorDistance(flamepos,targetpos);
-										float damage = 3.25*((time-g_flameHit[particle])/time) + 3.25;
+										float damage = 3.5*((time-g_flameHit[particle])/time) + 3.5;
 										bool hit = false;
 
 										if(distance<35.0)
@@ -8202,8 +8182,25 @@ public void AutoDetStickies(DataPack pack)
 		int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
 		if(GetVectorDistance(pos,pipePos)<120 && owner==attacker)
 		{
+			float dmg = GetEntPropFloat(ent, Prop_Send, "m_flDamage");
+			SetEntPropFloat(ent, Prop_Send, "m_flDamage", dmg*1.2);
 			SDKCall(g_hSDKDetonate, ent);
 		}
+	}
+}
+
+public void IronFire(int iClient)
+{
+	if(IsValidClient(iClient))
+	{
+		int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
+		// SetEntProp(primary, Prop_Send, "m_iWeaponState", 0);
+		float time = GetGameTime();
+		SetEntPropFloat(primary, Prop_Send, "m_flNextPrimaryAttack",time+1.05);
+		SetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack",time+1.05);
+		SetEntPropFloat(primary, Prop_Send, "m_flTimeWeaponIdle",GetGameTime());
+		g_condFlags[iClient] &= ~TF_CONDFLAG_HEATER;
+		g_condFlags[iClient] &= ~TF_CONDFLAG_FAKE;
 	}
 }
 
@@ -8362,10 +8359,15 @@ Action ResetPressure(Handle timer, int user)
 
 		float pressure = GetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 0);
 		if(primaryIndex == 1178) pressure = g_meterPri[user];
-		if(pressure < 50.0)
+		if(pressure < 100-PRESSURE_COST)
 		{
-			if(primaryIndex == 1178) g_meterPri[user] = 50.0;
-			else SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 50.0, 0);
+			if(primaryIndex == 1178) g_meterPri[user] = pressure+PRESSURE_COST;
+			else SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", pressure+PRESSURE_COST, 0);
+		}
+		else 
+		{
+			if(primaryIndex == 1178) g_meterPri[user] = 100.0;
+			else SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
 		}
 	}
 	return Plugin_Continue;
@@ -8571,6 +8573,64 @@ Action FlameTouch(int flame, int other) //lingering flamethrower flames
 	}
 	return Plugin_Continue;
 }
+
+// Action FireTouch(int flame, int other) //lingering flamethrower flames
+// {
+// 	int owner = GetEntPropEnt(flame, Prop_Send, "m_hOwnerEntity");
+// 	int weapon = GetEntPropEnt(flame, Prop_Send, "m_hLauncher");
+// 	int weaponIndex = -1;
+// 	if(weapon >= 0) weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+
+// 	char class[64];
+// 	GetEntityClassname(other, class, sizeof(class));
+	
+// 	if(weaponIndex==1178)
+// 	{
+// 		if(other==0 || StrEqual(class,"func_brush"))
+// 		{
+// 			float pos[3],ang[3],ownerPos[3];
+// 			GetEntPropVector(flame, Prop_Send, "m_vecOrigin", pos);
+// 			GetClientEyeAngles(owner, ang);
+			
+// 			Handle trace = TR_TraceRayFilterEx(pos, ang, MASK_SHOT, RayType_Infinite, TraceFilter, flame);
+// 			if(!TR_DidHit(trace))
+// 			{
+// 				trace.Close();
+// 				return Plugin_Continue;
+// 			}
+// 			TR_GetEndPosition(pos, trace);
+// 			GetEntPropVector(owner, Prop_Send, "m_vecOrigin", ownerPos);
+// 			if(GetVectorDistance(pos,ownerPos)>340)
+// 			{
+// 				trace.Close();
+// 				return Plugin_Continue;
+// 			}
+
+// 			GetEntPropVector(flame, Prop_Send, "m_vecOrigin", pos);
+// 			int team = GetEntProp(flame, Prop_Send, "m_iTeamNum");
+// 			float fireTime = FIRE_TIME;
+// 			if(g_bIsMVM) //mvm burn time
+// 			{
+// 				Address addr = TF2Attrib_GetByName(weapon, "weapon burn time increased");
+// 				if(addr != Address_Null)
+// 				{
+// 					float value = TF2Attrib_GetValue(addr);
+// 					fireTime *= value;
+// 				}
+// 			}
+// 			CreateParticle(0,"burninggibs",fireTime/1.25,_,_,pos[0],pos[1],pos[2],0.2,_,_,_,_,owner);
+// 			if(team==2)
+// 			{
+// 				CreateParticle(0,"burningplayer_glow",fireTime,_,_,pos[0],pos[1],pos[2],_,false);
+// 			}
+// 			else if(team==3)
+// 			{
+// 				CreateParticle(0,"burningplayer_glow_blue",fireTime,_,_,pos[0],pos[1],pos[2],_,false);
+// 			}
+// 		}
+// 	}
+// 	return Plugin_Continue;
+// }
 
 void laserSpawn(int iEnt)
 {
@@ -8836,10 +8896,10 @@ Action flareTouch(int entity, int other)
 	weapon = GetEntPropEnt(entity, Prop_Send, "m_hLauncher");
 	int wepIndex = -1;
 	if (weapon != -1) wepIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-	if (StrEqual(class, "tf_projectile_flare") && 740 == wepIndex)
+	if (StrEqual(class, "tf_projectile_flare") && 740 == wepIndex) //scorch shot bounce
 	{
 		GetEntityClassname(other, class, sizeof(class));
-		if (IsValidClient(other))
+		if (IsValidClient(other)) //bounce off players
 		{
 			if(TF2_GetClientTeam(owner) != TF2_GetClientTeam(other))
 			{
@@ -8853,7 +8913,7 @@ Action flareTouch(int entity, int other)
 				}
 			}
 		}
-		else if(other==0)
+		else //bounce off world
 		{
 			if(GetEntProp(entity, Prop_Data, "m_iHealth") == 0)
 			{
@@ -8987,10 +9047,10 @@ void AirblastPush(int client,float base)
 	int primaryIndex = -1;
 	if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
 
-	float meter = (base / 1.2) * 100;
+	float meter = base;
 	meter *= PRESSURE_FORCE;
 	if (primaryIndex==40||primaryIndex==1146) //backburner force
-		meter *= 1.25;
+		meter *= 1.3;
 	else if(primaryIndex==594) //phlogistinator "force"
 		meter *= 0.00;
 	if(g_bIsMVM) //mvm force
