@@ -9,9 +9,9 @@
 #include <WeaponAttachmentAPI>
 #pragma newdecls required
 #pragma semicolon 1
-#define VDECODE_FLAG_ALLOWWORLD  (1<<2)
+// #define VDECODE_FLAG_ALLOWWORLD  (1<<2)
 
-ConVar g_bEnablePlugin; // Convar that enables plugin
+// ConVar g_bEnablePlugin; // Convar that enables plugin
 ConVar g_bApplyClassChangesToBots; // Convar that decides if attributes should apply to bots.
 ConVar g_bApplyClassChangesToMvMBots; // Convar that decides if attributes should apply to MvM bots.
 
@@ -37,7 +37,6 @@ int g_consecHits[MAXPLAYERS+1];
 int g_condFlags[MAXPLAYERS+1];
 int g_lastHeal[MAXPLAYERS+1];
 int g_lockOn[MAXPLAYERS+1];
-int g_Fov[MAXPLAYERS+1];
 int g_spawnPumpkin[MAXPLAYERS+1];
 int g_spyTaunt[MAXPLAYERS+1];
 int g_engyDispenser[MAXPLAYERS+1];
@@ -144,9 +143,9 @@ public void OnPluginStart()
 		SetFailState("Failed to open gamedata.rehab.txt. Unable to load plugin");
 	}
 
-	g_bEnablePlugin = CreateConVar("sm_bwaplugin_enable", "1",
-	"Enables/Disables the plugin. Default = 1, 0 to disable.",
-	FCVAR_PROTECTED, true, 0.0, true, 1.0);
+	// g_bEnablePlugin = CreateConVar("sm_bwaplugin_enable", "1",
+	// "Enables/Disables the plugin. Default = 1, 0 to disable.",
+	// FCVAR_PROTECTED, true, 0.0, true, 1.0);
 	g_bApplyClassChangesToBots = CreateConVar("sm_bwaplugin_bots_apply", "1",
 	"Should changes apply to Bots? Enabling this could cause issues. Default = 1, 1 to enable.",
 	FCVAR_PROTECTED, true, 0.0, true, 1.0);
@@ -523,32 +522,33 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 
 public Action LogGameMessage(const char[] message)
 {
-	if(StrContains(message,"player_extinguished") != -1 && (StrContains(message,"tf_weapon_jar") != -1 || StrContains(message,"tf_weapon_flaregun_revenge") != -1))
-	{
-		int idStartPos = StrContains(message,"<")+1;
-		int idEndPos = StrContains(message,"[U:1:") - 2;
-		if(idEndPos < 0)
-			idEndPos = StrContains(message,"<BOT>") - 1;
-		char[] id = new char[MAX_NAME_LENGTH];
-		strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
-		id[idEndPos-idStartPos] = 0;
-		int user = GetClientOfUserId(StringToInt(id));
-		int secondary = TF2Util_GetPlayerLoadoutEntity(user, TFWeaponSlot_Secondary, true);
-		int secondaryIndex = -1;
-		if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-		switch(secondaryIndex)
-		{
-			case 1180: //gas passer
-				SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 33.333, 1);
-			case 58,222,1121,1083,1105: //milk and jarate
-			{
-				SetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime",GetGameTime()+26.5);
-				SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime",GetGameTime()+26.5);
-			}
-		}
-		return Plugin_Changed;
-	}
-	else if(StrContains(message,"player_extinguished") && (StrContains(message,"tf_weapon_flamethrower") != -1 || StrContains(message,"tf_weapon_rocketlauncher_fireball") != -1))
+	// if(StrContains(message,"player_extinguished") != -1 && (StrContains(message,"tf_weapon_jar") != -1 || StrContains(message,"tf_weapon_flaregun_revenge") != -1))
+	// {
+	// 	int idStartPos = StrContains(message,"<")+1;
+	// 	int idEndPos = StrContains(message,"[U:1:") - 2;
+	// 	if(idEndPos < 0)
+	// 		idEndPos = StrContains(message,"<BOT>") - 1;
+	// 	char[] id = new char[MAX_NAME_LENGTH];
+	// 	strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
+	// 	id[idEndPos-idStartPos] = 0;
+	// 	int user = GetClientOfUserId(StringToInt(id));
+	// 	int secondary = TF2Util_GetPlayerLoadoutEntity(user, TFWeaponSlot_Secondary, true);
+	// 	int secondaryIndex = -1;
+	// 	if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+	// 	switch(secondaryIndex)
+	// 	{
+	// 		case 1180: //gas passer
+	// 			SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 33.333, 1);
+	// 		case 58,222,1121,1083,1105: //milk and jarate
+	// 		{
+	// 			SetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime",GetGameTime()+26.5);
+	// 			SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime",GetGameTime()+26.5);
+	// 		}
+	// 	}
+	// 	return Plugin_Changed;
+	// }
+	// else
+	if(StrContains(message,"player_extinguished") && (StrContains(message,"tf_weapon_flamethrower") != -1 || StrContains(message,"tf_weapon_rocketlauncher_fireball") != -1))
 	{
 		int idStartPos = StrContains(message,"<")+1;
 		int idEndPos = StrContains(message,"[U:1:") - 2;
@@ -583,22 +583,54 @@ public Action Event_PlayerSpawn(Handle hEvent, const char[] cName, bool dontBroa
 		g_meterMel[iClient] = GetEntProp(iClient, Prop_Send, "m_iHealPoints")+0.0;
 	}
 
-	char[] event = new char[64];
-	GetEventName(hEvent,event,64);
-	DataPack pack = new DataPack();
-	pack.Reset();
-	pack.WriteCell(iClient);
-	pack.WriteString(event);
-	float time=0.1;
-	if(IsFakeClient(iClient)) time=0.25;
-	CreateTimer(time,PlayerSpawn,pack);
+	if(!IsFakeClient(iClient) || !g_bIsMVM)
+	{
+		char[] event = new char[64];
+		GetEventName(hEvent,event,64);
+		DataPack pack = new DataPack();
+		pack.Reset();
+		pack.WriteCell(iClient);
+		pack.WriteString(event);
+		float time=0.1;
+		if(IsFakeClient(iClient))
+		{
+			time=0.33;
+			CreateTimer(0.25,BotWeapons,iClient);
+		}
+		CreateTimer(time,PlayerSpawn,pack);
+	}
 
 	SetCommandFlags("r_screenoverlay", GetCommandFlags("r_screenoverlay") & ~FCVAR_CHEAT);
 	ClientCommand(iClient, "r_screenoverlay \"\"");
 	SetCommandFlags("r_screenoverlay", GetCommandFlags("r_screenoverlay") | FCVAR_CHEAT);
 	return Plugin_Changed;
 }
-
+public Action BotWeapons(Handle timer, int iClient)
+{
+	if(IsValidClient(iClient))
+	{
+		if(IsFakeClient(iClient))
+		{
+			int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
+			int primaryIndex = -1;
+			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
+			int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
+			int secondaryIndex = -1;
+			if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+			int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
+			int meleeIndex = -1;
+			if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+			char class1[64],class2[64],class3[64];
+			GetEntityClassname(primary,class1,64);
+			TF2Items_OnGiveNamedItem_Post(iClient, class1, primaryIndex, GetEntProp(primary, Prop_Send, "m_iEntityLevel"), GetEntProp(primary, Prop_Send, "m_iEntityQuality"), primary);
+			GetEntityClassname(secondary,class2,64);
+			TF2Items_OnGiveNamedItem_Post(iClient, class2, secondaryIndex, GetEntProp(secondary, Prop_Send, "m_iEntityLevel"), GetEntProp(secondary, Prop_Send, "m_iEntityQuality"), secondary);
+			GetEntityClassname(melee,class3,64);
+			TF2Items_OnGiveNamedItem_Post(iClient, class3, meleeIndex, GetEntProp(melee, Prop_Send, "m_iEntityLevel"), GetEntProp(melee, Prop_Send, "m_iEntityQuality"), melee);
+		}
+	}
+	return Plugin_Changed;
+}
 public Action PlayerSpawn(Handle timer, DataPack dPack)
 {
 	dPack.Reset();
@@ -606,7 +638,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 	char[] event = new char[64];
 	dPack.ReadString(event,64);
 
-	if (IsValidClient(iClient) && g_bEnablePlugin.BoolValue)
+	if (IsValidClient(iClient))
 	{
 		int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
 		int primaryIndex = -1;
@@ -617,9 +649,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
 		int meleeIndex = -1;
 		if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
-		int watch = TF2Util_GetPlayerLoadoutEntity(iClient, 6, true);
-		int watchIndex = -1;
-		if(watch >= 0) watchIndex = GetEntProp(watch, Prop_Send, "m_iItemDefinitionIndex");
 		
 		g_holsterPri[iClient] = 1.0;
 		g_holsterSec[iClient] = 1.0;
@@ -650,98 +679,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 
 		switch(TF2_GetPlayerClass(iClient))
 		{
-			case TFClass_Sniper:
-			{
-				//modify sniper ammo
-				if(primaryIndex!=56 && primaryIndex!=1005 && primaryIndex!=1092) //ignore bows
-				{					
-					TF2Attrib_SetByDefIndex(primary,77,0.6); //set max ammo
-					if(primaryIndex != 526 && primaryIndex != 30665) //set tracers
-					{ 
-						TF2Attrib_SetByDefIndex(primary,647,1.0);
-						if(primaryIndex != 230) TF2Attrib_SetByDefIndex(primary,144,3.0);
-						if(primaryIndex == 752) TF2Attrib_SetByDefIndex(primary,51,0.0);
-					}
-					//set clip and reserve
-					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-					int clip = 4; //default clip size
-					switch(primaryIndex)
-					{
-						case 1098: //Classic clip bonus
-							clip = 6;
-						case 526, 30665: //Machina clip penalty
-							clip = 3;
-					}
-					if(g_bIsMVM) //mvm clip
-					{
-						Address addr = TF2Attrib_GetByName(primary, "clip size bonus");
-						if(addr != Address_Null)
-						{
-							float value = TF2Attrib_GetValue(addr);
-							clip = RoundFloat(clip * value);
-						}
-					}
-					TF2Attrib_SetByDefIndex(primary,303,clip+0.0); //set clip ammo
-					SetEntData(primary, iAmmoTable, clip, 4, true);
-					SetEntProp(primary, Prop_Send, "m_iClip1",clip);
-					int reserve = 16;
-					if(g_bIsMVM) //mvm reserve
-					{
-						Address addr = TF2Attrib_GetByName(primary, "maxammo primary increased");
-						if(addr != Address_Null)
-						{
-							float value = TF2Attrib_GetValue(addr);
-							reserve = RoundFloat(reserve * value);
-						}
-					}
-					int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-					SetEntProp(iClient, Prop_Data, "m_iAmmo", reserve , _, primaryAmmo);
-				}
-			}
-			case TFClass_Pyro: 
-			{
-				// modify pyro airblast
-				if(primaryIndex!=594) //ignore phlog
-				{
-					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
-					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 10);
-					float force = 1.0;
-					if(g_bIsMVM) //mvm force
-					{
-						Address addr = TF2Attrib_GetByName(primary, "melee range multiplier");
-						if(addr != Address_Null)
-						{
-							float value = TF2Attrib_GetValue(addr);
-							force *= value;
-						}
-					}
-					TF2Attrib_SetByDefIndex(primary,164,force); //airblast force
-				}
-			}
-			case TFClass_Spy:
-			{
-				if(watch != -1) TF2Attrib_SetByDefIndex(watch,253,-0.25); //mult cloak rate
-				if(watch != -1) TF2Attrib_SetByDefIndex(watch,221,0.75); //mult decloak rate
-				if(secondary != -1) TF2Attrib_SetByDefIndex(secondary,51,1.0); //revolver use hit locations
-			}
-			case TFClass_DemoMan:
-			{
-				switch(secondaryIndex)
-				{
-					case 59: //screen
-					{
-						TF2Attrib_SetByDefIndex(secondary,249,1.5); //shield recharge rate
-					}
-					case 131,1099,1144: //targe, turner
-					{
-						TF2Attrib_SetByDefIndex(secondary,249,1.0); //shield recharge rate
-					}
-				}
-			}
-			case TFClass_Heavy:
-			{
-				TF2Attrib_SetByDefIndex(iClient,201,1.0); //animation speeds for steak
-			}
 			case TFClass_Engineer:
 			{
 				//southern hospitality range
@@ -789,73 +726,16 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			TF2Attrib_SetByName(iClient, "metal regen", met);
 		}
 
-		//Panic Attack
-		if(secondaryIndex == 1153 || primaryIndex == 1153)
-		{
-			int wep = secondaryIndex == 1153 ? secondary : primary;
-			TF2Attrib_SetByDefIndex(wep,348,1.0); //firing speed bonus
-			TF2Attrib_SetByDefIndex(wep,3,0.66); //clip size penalty
-			TF2Attrib_SetByDefIndex(wep,1,0.85); //damage penalty
-			TF2Attrib_SetByDefIndex(wep,808,0.0); //damage penalty
-			int clip = 4;
-			if(g_bIsMVM) //mvm clip
-			{
-				Address addr = TF2Attrib_GetByName(wep, "clip size bonus");
-				if(addr != Address_Null)
-				{
-					float value = TF2Attrib_GetValue(addr);
-					clip = RoundFloat(clip*value);
-				}
-			}
-			int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-			SetEntData(wep, iAmmoTable, clip, _, true);
-		}
-
 		switch(primaryIndex)
 		{
-			//The Classic
-			case 1098:
-			{
-				TF2Attrib_SetByDefIndex(primary,306,1.0); //headshots only at full charge
-				TF2Attrib_SetByDefIndex(primary,4,1.5); //clip size bonus
-			}
-			//Brass Beast
-			case 312:
-			{
-				TF2Attrib_SetByDefIndex(primary,738,0.75); //spinup damge resistance
-			}
-			//Huo-Long Heater
-			case 811,832:
-			{
-				TF2Attrib_SetByDefIndex(primary,1,1.0); //damage penalty
-				TF2Attrib_SetByDefIndex(primary,21,0.9); //damage penalty vs non-burning players
-				TF2Attrib_SetByDefIndex(primary,795,1.15); //damage bonus vs burning
-				TF2Attrib_SetByDefIndex(primary,431,3.0); //spinup ammo drain
-			}
 			//Baby Face's Blaster
 			case 772:
 			{
-				TF2Attrib_SetByDefIndex(primary,733,2.0); //hype lost on damge
-				TF2Attrib_SetByDefIndex(primary,419,50.0); //hype resets on jump
-				if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
-				{
-					g_meterPri[iClient]=0.0;
-				}
 				SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
-			}
-			//Liberty Launcher
-			case 414:
-			{
-				TF2Attrib_SetByDefIndex(primary,6,0.85); //firing speed bonus
-				TF2Attrib_SetByDefIndex(primary,100,0.9); //Blast radius decreased
 			}
 			//The Pomson 6000
 			case 588:
 			{
-				TF2Attrib_SetByDefIndex(primary,337,0.0); //victim loses medigun charge
-				TF2Attrib_SetByDefIndex(primary,338,0.0); //victim loses cloak
-				TF2Attrib_SetByDefIndex(primary,6,0.8); //firing speed bonus
-				TF2Attrib_SetByDefIndex(primary,97,0.85); //reload speed bonus
 				float clip = 20.0;
 				if(g_bIsMVM) //mvm force
 				{
@@ -866,51 +746,17 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 						clip *= value;
 					}
 				}
-				TF2Attrib_SetByDefIndex(primary,335,clip/20.0); //clip size upgrade
 				SetEntPropFloat(primary, Prop_Send, "m_flEnergy", clip);
-				TF2Attrib_SetByDefIndex(primary,103,1.5); //projectile speed
-			}
-			//The Back Scatter
-			case 1103:
-			{
-				//
-			}
-			//The Shortstop
-			case 220:
-			{
-				TF2Attrib_SetByDefIndex(primary,97,0.9); //Reload time decreased
-			}
-			//Syringe Gun
-			case 17,204:
-			{
-				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
 			}
 			//The Blutsauger
 			case 36:
 			{
-				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
-				TF2Attrib_SetByDefIndex(primary,3,0.63); //clip size penalty
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, 25, _, true);
-			}
-			//The Overdose
-			case 412:
-			{
-				TF2Attrib_SetByDefIndex(primary,280,9.0); //projectile override
-				TF2Attrib_SetByDefIndex(primary,1,0.8); //damage penalty
-				TF2Attrib_SetByDefIndex(primary,792,1.25); //move speed bonus resource level
-			}
-			//The Phlogistinator
-			case 594:
-			{
-				//
 			}
 			//Natascha
 			case 41:
 			{
-				TF2Attrib_SetByDefIndex(primary,32,0.0); //slow on hit
-				TF2Attrib_SetByDefIndex(primary,738,1.0); //spinup damge resistance
-				TF2Attrib_SetByDefIndex(primary,740,0.33); //reduced_healing_from_medics
 				float maxammo = 1.5;
 				if(g_bIsMVM)
 				{
@@ -925,17 +771,9 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
 				SetEntProp(iClient, Prop_Data, "m_iAmmo", RoundFloat(200*maxammo) , _, primaryAmmo);
 			}
-			//Bazaar Bargain
-			case 402:
-			{
-				TF2Attrib_SetByDefIndex(primary,41,1.5); //sniper charge
-				TF2Attrib_SetByDefIndex(primary,268,1.0); //mult sniper charge penalty DISPLAY ONLY
-			}
 			//Loch-n-Load
 			case 308:
 			{
-				TF2Attrib_SetByDefIndex(primary,97,0.8); //reload speed bonus
-				TF2Attrib_SetByDefIndex(primary,3,0.5); //clip size penalty
 				int clip = 2;
 				if(g_bIsMVM)
 				{
@@ -948,166 +786,25 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				}
 				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
 				SetEntData(primary, iAmmoTable, clip, _, true);
-				TF2Attrib_SetByDefIndex(primary,137,1.0); //dmg bonus vs buildings
-			}
-			//Sydney Sleeper
-			case 230:
-			{
-				TF2Attrib_SetByDefIndex(primary,41,1.0); //sniper charge
-				TF2Attrib_SetByDefIndex(primary,175,2.0); //jarate duration
-				TF2Attrib_SetByDefIndex(primary,869,1.0); //crits become minicrits
-				TF2Attrib_SetByDefIndex(primary,42,3.0); //weapon mode
-				TF2Attrib_SetByDefIndex(primary,6,0.67); //fire rate bonus
-				SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
-			}
-			//Air Strike
-			case 1104:
-			{
-				TF2Attrib_SetByDefIndex(primary,100,0.8); //Blast radius decreased
-			}
-			//B.A.S.E. Jumper Demo
-			case 1101:
-			{
-				TF2Attrib_SetByDefIndex(primary,610,2.0); //increased air control
-				TF2Attrib_SetByDefIndex(primary,135,0.75); //rocket jump damage reduction
-			}
-			//The Machina
-			case 526,30665:
-			{
-				TF2Attrib_SetByDefIndex(primary,304,1.0); //sniper full charge damage bonus
-				TF2Attrib_SetByDefIndex(primary,266,1.0); //projectile penetration
-				TF2Attrib_SetByDefIndex(primary,3,0.75); //clip size penalty
-				TF2Attrib_SetByDefIndex(primary,41,0.75); //sniper charge
-				TF2Attrib_SetByDefIndex(primary,269,1.0); //mod see enemy health
-			}
-			//Tomislav
-			case 424:
-			{
-				TF2Attrib_SetByDefIndex(primary,87,0.8); //minigun spinup time decreased
-				TF2Attrib_SetByDefIndex(primary,5,1.3); //fire rate penalty
-				TF2Attrib_SetByDefIndex(primary,106,0.8); //spread bonus
-				TF2Attrib_SetByDefIndex(primary,2,1.0); //damage bonus
-			}
-			//Loose Cannon
-			case 996:
-			{
-				TF2Attrib_SetByDefIndex(primary,207,0.75); //blast dmg to self decreased
-			}
-			//Backburner
-			case 40,1146:
-			{
-				//
-			}
-			//Iron Bomber
-			case 1151:
-			{
-				TF2Attrib_SetByDefIndex(primary,100,0.7); //blast radius decreased
-				TF2Attrib_SetByDefIndex(primary,787,1.3); //fuse bonus
-				TF2Attrib_SetByDefIndex(primary,5,1.2); //fire rate penalty
-			}
-			//Crusader's Crossbow
-			case 305,1079:
-			{
-				TF2Attrib_SetByDefIndex(primary,77,0.1); //maxammo primary reduced
-				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-				SetEntProp(iClient, Prop_Data, "m_iAmmo", 15, _, primaryAmmo);
-			}
-			//Cow Mangler 5000
-			case 441:
-			{
-				//
-			}
-			//Soda Popper
-			case 448:
-			{
-				//
 			}
 			//Dragon's Fury
 			case 1178:
 			{
 				g_meterPri[iClient]=100.0;
 			}
-			//Iron Curtain
-			case 298:
-			{
-				TF2Attrib_SetByDefIndex(primary,350,1.0); //ragdolls become ash
-				TF2Attrib_SetByDefIndex(primary,106,0.001); //spread bonus
-				TF2Attrib_SetByDefIndex(primary,809,1.0); //fixed_shot_pattern
-				TF2Attrib_SetByDefIndex(primary,5,10.0); //firing speed bonus
-				TF2Attrib_SetByDefIndex(primary,305,1.0); //sniper fires tracer
-				TF2Attrib_SetByDefIndex(primary,2,8.0); //damage bonus
-				TF2Attrib_SetByDefIndex(primary,45,0.25); //bullets per shot bonus
-				TF2Attrib_SetByDefIndex(primary,77,0.2); //maxammo primary reduced
-				TF2Attrib_SetByDefIndex(primary,266,1.0); //projectile penetration
-				int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-				SetEntProp(iClient, Prop_Data, "m_iAmmo", 40, _, primaryAmmo);
-			}
 		}
 
 		switch(secondaryIndex)
 		{
-			//Flare Gun
-			case 39,1081:
-			{
-				TF2Attrib_SetByDefIndex(secondary,2029,1.0); //allowed in medieval mode
-			}
-			//Pretty Boy's Pocket Pistol
-			case 773:
-			{
-				TF2Attrib_SetByDefIndex(secondary,1,0.85); //damage penalty
-			}
-			//The Righteous Bison
-			case 442:
-			{
-				TF2Attrib_SetByDefIndex(secondary,2,2.5); //damage bonus
-				TF2Attrib_SetByDefIndex(secondary,6,0.8); //firing speed bonus
-				TF2Attrib_SetByDefIndex(secondary,103,1.5); //projectile speed
-			}
 			//The Enforcer
 			case 460:
 			{
-				// TF2Attrib_SetByDefIndex(secondary,410,1.3); //damage bonus while disguised
-				TF2Attrib_SetByDefIndex(secondary,221,0.25); //mult decloak rate
 				if(g_meterSec[iClient]<1000)
 					g_meterSec[iClient] = 0.0;
-			}
-			//Buffalo Steak Sandvich
-			case 311:
-			{
-				TF2Attrib_SetByDefIndex(secondary,798,1.0); //energy buff dmg taken multiplier
-				TF2Attrib_SetByDefIndex(secondary,252,1.0); //damage force reduction
-				TF2Attrib_SetByDefIndex(secondary,329,1.0); //airblast vulnerability multiplier
-			}
-			//Dalokohs Bar
-			case 159, 433:
-			{
-				//
 			}
 			//Jarate, Mad Milk
 			case 58,222,1121,1083,1105:
 			{
-				TF2Attrib_SetByDefIndex(secondary,2029,1.0); //allowed in medieval mode
-				TF2Attrib_SetByDefIndex(secondary,856,3.0); //meter type
-				TF2Attrib_SetByDefIndex(secondary,848,-1.0); //spawn doesn't affect resup
-				float time = 2.0;
-				if(g_bIsMVM) //mvm time
-				{
-					Address addr = TF2Attrib_GetByName(secondary, "melee range multiplier");
-					if(addr != Address_Null)
-					{
-						float value = TF2Attrib_GetValue(addr);
-						time *= value;
-					}
-				}
-				TF2Attrib_SetByDefIndex(secondary,278,time); //recharge rate
-				if(secondaryIndex == 222 || secondaryIndex == 1121) //milk recharge
-				{
-					TF2Attrib_SetByDefIndex(secondary,2059,500.0); //damage to recharge
-				}
-				else //jarate splash reduction
-				{
-					TF2Attrib_SetByDefIndex(secondary,100,1.0); //Blast radius decreased
-				}
 				if(StrEqual(event,"player_spawn") || g_meterSec[iClient] < 0.3) //reset meter it on spawn, or if haven't had item for over 0.3 seconds
 				{
 					int iOffset = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType", 1)*4;
@@ -1118,557 +815,100 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime",GetGameTime());
 				}
 			}
-			//The Gas Passer
-			case 1180:
-			{
-				TF2Attrib_SetByDefIndex(secondary,2029,1.0); //allowed in medieval mode
-				float time = 40.0;
-				if(g_bIsMVM) //mvm time
-				{
-					Address addr = TF2Attrib_GetByName(secondary, "melee bounds multiplier");
-					if(addr != Address_Null)
-					{
-						float value = TF2Attrib_GetValue(addr);
-						time *= value;
-					}
-				}
-				TF2Attrib_SetByDefIndex(secondary,801,time); //recharge time
-				TF2Attrib_SetByDefIndex(secondary,2059,500.0); //damage to recharge
-				TF2Attrib_SetByDefIndex(secondary,74,1.0); //burn time
-				if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
-					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
-				TF2Attrib_SetByDefIndex(secondary,875,1.0); //explode_on_ignite
-			}
 			//The Razorback
 			case 57:
 			{
-				//set sheild status txt
-				SetEntProp(secondary, Prop_Data, "m_fEffects", 129);
-			}
-			//Cleaner's Carbine
-			case 751:
-			{
-				TF2Attrib_SetByDefIndex(secondary,106,0.75); //spread bonus
-				TF2Attrib_SetByDefIndex(secondary,5,1.2); //fire rate penalty
-				TF2Attrib_SetByDefIndex(secondary,780,0.8333); //minicrit boost charge rate
-			}
-			//Thermal Thruster
-			case 1179:
-			{
-				TF2Attrib_SetByDefIndex(secondary,840,0.4); //holster anim time
-				TF2Attrib_SetByDefIndex(secondary,547,0.5); //deploy speed bonus
-				TF2Attrib_SetByDefIndex(secondary,400,1.0); //cannot pick up intelligence
-			}
-			//B.A.S.E. Jumper Soldier
-			case 1101:
-			{
-				TF2Attrib_SetByDefIndex(secondary,610,2.0); //increased air control
-				TF2Attrib_SetByDefIndex(secondary,135,0.75); //rocket jump damage reduction
-			}
-			//The Vaccinator
-			case 998:
-			{
-				TF2Attrib_SetByDefIndex(secondary,503,0.1); //bullet resist passive
-				TF2Attrib_SetByDefIndex(secondary,504,0.1); //blast resist passive
-				TF2Attrib_SetByDefIndex(secondary,505,0.1); //fire resist passive
-				TF2Attrib_SetByDefIndex(secondary,506,0.4); //bullet resist deployed
-				TF2Attrib_SetByDefIndex(secondary,507,0.4); //blast resist deployed
-				TF2Attrib_SetByDefIndex(secondary,508,0.4); //fire resist deployed
-			}
-			//Darwin's Danger Shield
-			case 231:
-			{
-				TF2Attrib_SetByDefIndex(secondary,26,15.0); //max health additive bonus
-				TF2Attrib_SetByDefIndex(secondary,60,1.0); //fire resistance
-				TF2Attrib_SetByDefIndex(secondary,527,0.0); //afterburn immunity
-				SetEntityHealth(iClient,140);
+				// //set sheild status txt
+				// SetEntProp(secondary, Prop_Data, "m_fEffects", 129);
 			}
 			//The Diamondback
 			case 525:
 			{
-				TF2Attrib_SetByDefIndex(secondary,296,0.0); //sapper kills collect crits
-				TF2Attrib_SetByDefIndex(secondary,1,1.0); //damage penalty
-				TF2Attrib_SetByDefIndex(secondary,3,0.67); //clip size penalty
-				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-				SetEntData(secondary, iAmmoTable, 4, _, true);
 				TF2_RemoveCondition(iClient,TFCond_Kritzkrieged);
 			}
-			//Detonator
-			case 351:
-			{
-				TF2Attrib_SetByDefIndex(secondary,207,1.2); //self blast damge increased
-				TF2Attrib_SetByDefIndex(secondary,74,0.66); //weapon burn time reduced
-			}
-			//Short Circuit
-			case 528:
-			{
-				TF2Attrib_SetByDefIndex(secondary,2,2.0); //damage bonus
-				TF2Attrib_SetByDefIndex(secondary,614,1.0); //no metal from dispensers while active
-			}
-			//Buff Banner
-			case 129,1001:
-			{
-				TF2Attrib_SetByDefIndex(secondary,76,1.5); //maxammo primary increased
-			}
-			//Scorch Shot
-			case 740:
-			{
-				TF2Attrib_SetByDefIndex(secondary,1,0.85); //damage penalty
-				TF2Attrib_SetByDefIndex(secondary,59,1.0); //self dmg push force decreased
-				TF2Attrib_SetByDefIndex(secondary,74,0.66); //weapon burn time reduced
-			}
-			//Manmelter
-			case 595:
-			{
-				// TF2Attrib_SetByDefIndex(secondary,1,1.2); //damage penalty
-				// TF2Attrib_SetByDefIndex(secondary,74,0.4); //weapon burn time reduced
-				// TF2Attrib_SetByDefIndex(secondary,6,0.75); //fire rate penalty
-			}
-			//Quick-Fix
-			case 411:
-			{
-				TF2Attrib_SetByDefIndex(secondary,144,2.0); //set_weapon_mode
-				
-			}
-			//Flying Guillotine
-			case 812,833:
-			{
-				float time = 1.6;
-				if(g_bIsMVM) //mvm time
-				{
-					Address addr = TF2Attrib_GetByName(secondary, "melee range multiplier");
-					if(addr != Address_Null)
-					{
-						float value = TF2Attrib_GetValue(addr);
-						time *= value;
-					}
-				}
-				TF2Attrib_SetByDefIndex(secondary,278,time); //mult_item_meter_charge_rate
-			}
-			//The Mantreads
-			case 444:
-			{
-				//
-			}
-			//The Winger
-			case 449:
-			{
-				TF2Attrib_SetByDefIndex(secondary,3,0.5); //clip size penalty
-				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
-				SetEntData(secondary, iAmmoTable, 6, _, true);
-			}
-			// //Cozy Camper
-			// case 642:
-			// {
-			// 	float maxammo = 1.25;
-			// 	if(g_bIsMVM) //mvm reserve
-			// 	{
-			// 		Address addr = TF2Attrib_GetByName(primary, "maxammo primary increased");
-			// 		if(addr != Address_Null)
-			// 		{
-			// 			float value = TF2Attrib_GetValue(addr);
-			// 			maxammo *= value;
-			// 		}
-			// 	}
-			// 	TF2Attrib_SetByDefIndex(primary,76,0.6*maxammo); //maxammo primary increased
-			// 	int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-			// 	SetEntProp(iClient, Prop_Data, "m_iAmmo", RoundFloat(16*maxammo) , _, primaryAmmo);
-			// }
 		}
 
 		// add 3-hit crit combo to (most) melee weapons - exemptions including swords & knives or those with "no random crits" and/or situational (mini)crits; KGB, SoaS, Skullcutter, atomizer made exempt
 		switch(meleeIndex)
 		{
-			case 349,43,357,416,38,1000,457,813,834,307,132,266,327,404,482,1082,155,232,450,37,1003,447,173,310,413,171:
+			case 404: //persian persuader
 			{
-				g_consecHits[iClient] = -1; //at -1, the consecutive hits won't be counted
-				TF2Attrib_SetByDefIndex(melee,15,0.0); //crit mod disabled
-				//demoknight specific changes:
-				switch(meleeIndex) //specific melee changes
+				switch(primaryIndex)
 				{
-					case 404: //persian persuader
+					case 405,608,1101:
 					{
-						TF2Attrib_SetByDefIndex(melee,79,0.5); //maxammo secondary reduced
-						switch(secondaryIndex)
-						{
-							case 131,406,1099,1144:
-							{
-								//skip shields
-							}
-							case 130: //ScotRes
-							{
-								int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-								SetEntProp(iClient, Prop_Data, "m_iAmmo", 18, _, secondaryAmmo);
-							}
-							case 265: //Stickyjumper
-							{
-								int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-								SetEntProp(iClient, Prop_Data, "m_iAmmo", 32, _, secondaryAmmo);
-							}
-							default: //other stickybombs
-							{
-								int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
-								if(TF2_GetPlayerClass(iClient)==TFClass_Soldier)
-									SetEntProp(iClient, Prop_Data, "m_iAmmo", 16, _, secondaryAmmo); //shotgun
-								else
-									SetEntProp(iClient, Prop_Data, "m_iAmmo", 12, _, secondaryAmmo);
-							}
-						}
+						//skip boots and BASE
+					}
+					default: //grenade launchers
+					{
+						int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
+						SetEntProp(iClient, Prop_Data, "m_iAmmo", 8, _, primaryAmmo);
 					}
 				}
-
-				switch(meleeIndex) //specific melee changes
+				switch(secondaryIndex)
 				{
-					//The Eyelander
-					case 132,266,482,1082:
+					case 131,406,1099,1144:
 					{
-						//reset head boost on spawn or retain on resup
-						int heads = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
-						int respawn = 0;
-						if(strcmp(event,"player_spawn") == 0)//reset meter it on spawn
-						{
-							heads = 0;
-							SetEntProp(iClient, Prop_Send, "m_iDecapitations", 0);
-							respawn = 1;
-						}
-						if(heads>4)
-							heads = 4; //cap heads 
-						float healthPenalty = heads*-15.0;
-						TF2Attrib_SetByDefIndex(melee,125,healthPenalty-15);
-						TF2Attrib_SetByDefIndex(melee,736,3.1); //speed boost on kill
-						if(respawn==1)
-							TF2Util_TakeHealth(iClient,200.0);
-						TF2Attrib_SetByDefIndex(melee,781,1.0); //is_a_sword
+						//skip shields
 					}
-					//Sun-On-A-Stick
-					case 349:
+					case 130: //ScotRes
 					{
-						TF2Attrib_SetByDefIndex(melee,1,0.8); //damage penalty
-						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-						ShowHudText(iClient,4,"HEAT: 0%");
-						if(strcmp(event,"player_spawn") == 0)
-						{
-							g_meterMel[iClient] = 0.0;
-							g_condFlags[iClient] |= TF_CONDFLAG_HEATSPAWN;
-						}
+						int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+						SetEntProp(iClient, Prop_Data, "m_iAmmo", 18, _, secondaryAmmo);
+					}
+					case 265: //Stickyjumper
+					{
+						int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+						SetEntProp(iClient, Prop_Data, "m_iAmmo", 32, _, secondaryAmmo);
+					}
+					default: //other stickybombs
+					{
+						int secondaryAmmo = GetEntProp(secondary, Prop_Send, "m_iPrimaryAmmoType");
+						if(TF2_GetPlayerClass(iClient)==TFClass_Soldier)
+							SetEntProp(iClient, Prop_Data, "m_iAmmo", 16, _, secondaryAmmo); //shotgun
 						else
-							SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",g_meterMel[iClient],2); //set SOAS HEAT meter
+							SetEntProp(iClient, Prop_Data, "m_iAmmo", 12, _, secondaryAmmo);
 					}
-					//Southern Hospitality
-					case 155:
-					{
-						TF2Attrib_SetByDefIndex(melee,61,1.0); //dmg taken from fire increased
-						TF2Attrib_SetByDefIndex(melee,2043,0.8); //upgrade rate decrease
-					}
-					//Claidheamh Mor
-					case 327:
-					{
-						TF2Attrib_SetByDefIndex(melee,5,1.2); //fire rate penalty
-						TF2Attrib_SetByDefIndex(melee,199,1/1.75); //holster speed bonus
-						TF2Attrib_SetByDefIndex(melee,412,1.0); //dmg taken increased
-						TF2Attrib_SetByDefIndex(melee,781,1.0); //is_a_sword
-					}
-					//Persian Persuader
-					case 404:
-					{
-						TF2Attrib_SetByDefIndex(melee,77,0.5); //maxammo primary reduced
-						switch(secondaryIndex)
-						{
-							case 405,608,1101:
-							{
-								//skip boots and BASE
-							}
-							default: //grenade launchers
-							{
-								int primaryAmmo = GetEntProp(primary, Prop_Send, "m_iPrimaryAmmoType");
-								SetEntProp(iClient, Prop_Data, "m_iAmmo", 8, _, primaryAmmo);
-							}
-						}
-						TF2Attrib_SetByDefIndex(melee,781,1.0); //is_a_sword
-					}
-					//The Ubersaw
-					case 37,1003:
-					{
-						TF2Attrib_SetByDefIndex(melee,5,1.0); //fire rate penalty
-						TF2Attrib_SetByDefIndex(melee,547,0.8); //deploy speed bonus
-						TF2Attrib_SetByDefIndex(melee,852,1.25); //mult_dmgtaken_active
-						g_holsterMel[iClient] = 1.5;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-					}
-					//The Axtinguisher
-					case 38,1000:
-					{
-						g_holsterMel[iClient] = 1.35;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-					}
-					//Ullapool Caber
-					case 307:
-					{
-						float gameTime = GetGameTime();
-						SetEntProp(melee, Prop_Send, "m_bBroken",0);
-						SetEntPropFloat(melee, Prop_Send, "m_flLastFireTime",gameTime);
-						TF2Attrib_SetByDefIndex(melee,773,1.6); //deploy time increased
-						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-						ShowHudText(iClient,4,"Caber: 100 %");
-					}
-					//Neon Annihilator
-					case 813, 834:
-					{
-						TF2Attrib_SetByDefIndex(melee,146,0.0); //damage applies to sappers
-						TF2Attrib_SetByDefIndex(melee,773,1.6); //deploy time increased
-						if(strcmp(event,"player_spawn") == 0 || GetEntPropFloat(melee, Prop_Send, "m_flLastFireTime") == 0.0)
-						{
-							SetEntProp(melee, Prop_Send, "m_bBroken",1);
-							g_meterMel[iClient] = 0.0;
-						}
-						SetEntPropFloat(melee, Prop_Send, "m_flLastFireTime",GetGameTime());
-						SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-						ShowHudText(iClient,4,"CHARGE: %.0f%",g_meterMel[iClient]);
-					}
-					//Disciplinary Action
-					case 447:
-					{
-						TF2Attrib_SetByDefIndex(melee,135,1.25); //rocket jump damage reduction
-					}
-					//Atomizer
-					case 450:
-					{
-						TF2Attrib_SetByDefIndex(melee,138,1.0); //damage penalty vs players
-						TF2Attrib_SetByDefIndex(melee,773,1.0); //single wep deploy time increased
-						g_holsterMel[iClient] = 1.6;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-					}
-					//The Vita-Saw
-					case 173:
-					{
-						TF2Attrib_SetByDefIndex(melee,811,0.001); //ubercharge_preserved
-						TF2Attrib_SetByDefIndex(melee,125,0.0); //max health additive penalty
-						TF2Attrib_SetByDefIndex(melee,7,0.85); //heal rate penalty
-						TF2Attrib_SetByDefIndex(melee,1,0.67); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,263,1.5); //melee_bounds_multiplier
-						if(GetClientHealth(iClient)<150)
-							SetEntityHealth(iClient,150);
-						g_meterMel[iClient] = GetEntProp(iClient, Prop_Send, "m_iHealPoints")+0.0;
-					}
-					//Warrior's Spirit
-					case 310:
-					{
-						TF2Attrib_SetByDefIndex(melee,412,1.0); //dmg taken increased
-					}
-					//Half-Zatoichi
-					case 357:
-					{
-						TF2Attrib_SetByDefIndex(melee,781,1.0); //is_a_sword
-					}
-					//Solemn Vow
-					case 413:
-					{
-						TF2Attrib_SetByDefIndex(melee,5,1.0); //fire rate penalty
-						TF2Attrib_SetByDefIndex(melee,851,0.9); //mult_player_movespeed_active
-						TF2Attrib_SetByDefIndex(melee,535,1.5); //damage force increase hidden
-					}
-					//Tribalman's shiv
-					case 171:
-					{
-						TF2Attrib_SetByDefIndex(melee,149,8.0); //bleeding duration
-						TF2Attrib_SetByDefIndex(melee,877,2.0); //speed boost on hit enemy
-						TF2Attrib_SetByDefIndex(melee,797,1.0); //dmg pierces resists absorbs
-						TF2Attrib_SetByDefIndex(melee,5,1.25); //fire rate penalty
-					}
-					//Killing Gloves of Boxing
-					case 43:
-					{
-						//
-					}
-					//APRIL FOOLS
 				}
 			}
-			default:
+			//Sun-On-A-Stick
+			case 349:
 			{
-				if(TF2_GetPlayerClass(iClient) == TFClass_Spy)
+				if(strcmp(event,"player_spawn") == 0)
 				{
-					g_consecHits[iClient] = -1;
-					switch(meleeIndex)
-					{
-						//Your Eternal Reward
-						case 225,574:
-						{
-							TF2Attrib_SetByDefIndex(melee,34,1.0); //cloak drain penalty
-						}
-						//Conniver's Kunai
-						case 356:
-						{
-							TF2Attrib_SetByDefIndex(melee,217,0.0); //sanguisuge
-							TF2Attrib_SetByDefIndex(melee,125,-40.0); //max health additive penalty
-							if(GetClientHealth(iClient)<85)
-								SetEntityHealth(iClient,86);
-						}
-						//The Spy-cicle
-						case 649:
-						{
-							TF2Attrib_SetByDefIndex(melee,359,0.0); //melts in fire
-							TF2Attrib_SetByDefIndex(melee,361,0.0); //become fireproof on hit by fire
-							SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",100.0,2); //durability meter
-							SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-							ShowHudText(iClient,4,"Spy-Cicle: 100%");
-							SetEntPropFloat(melee, Prop_Send, "m_flLastFireTime",GetGameTime());
-						}
-					}
+					g_meterMel[iClient] = 0.0;
+					g_condFlags[iClient] |= TF_CONDFLAG_HEATSPAWN;
 				}
-				else g_consecHits[iClient] = 0;
-				switch(meleeIndex) //other melee changes
+				else
+					SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",g_meterMel[iClient],2); //set SOAS HEAT meter
+			}
+			//Neon Annihilator
+			case 813, 834:
+			{
+				if(strcmp(event,"player_spawn") == 0 || GetEntPropFloat(melee, Prop_Send, "m_flLastFireTime") == 0.0)
 				{
-					//The Equalizer
-					case 128:
+					SetEntProp(melee, Prop_Send, "m_bBroken",1);
+					g_meterMel[iClient] = 0.0;
+				}
+			}
+			//Scotsman's skullcutter
+			case 172:
+			{
+				switch(secondaryIndex)
+				{
+					case 59: //screen
 					{
-						TF2Attrib_SetByDefIndex(melee,224,1.4); //increase damage below 50% HP
-						TF2Attrib_SetByDefIndex(melee,225,0.6); //decrease damage above 50% HP
+						TF2Attrib_SetByDefIndex(secondary,249,1.5*1.2); //shield recharge rate
 					}
-					//Eviction Notice
-					case 426:
+					case 131,1099,1144: //targe, turner
 					{
-						TF2Attrib_SetByDefIndex(melee,128,1.0); //provide while active
-						TF2Attrib_SetByDefIndex(melee,1,0.45); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,855,0.0); //max health drain
-						TF2Attrib_SetByDefIndex(melee,852,1.25); //mult_dmgtaken_active
-						TF2Attrib_SetByDefIndex(melee,547,0.8); //deploy speed bonus
-					}
-					//The Sandman
-					case 44:
-					{
-						TF2Attrib_SetByDefIndex(melee,278,1.0); //effect bar recharge rate
-					}
-					//Candy Cane
-					case 317:
-					{
-						TF2Attrib_SetByDefIndex(melee,65,1.0); //dmg taken from blast increased
-						TF2Attrib_SetByDefIndex(melee,67,1.25); //dmg taken from bullet increased
-					}
-					//Fan O'War
-					case 355:
-					{
-						TF2Attrib_SetByDefIndex(melee,199,0.75); //holster speed bonus
-					}
-					//Sharpened Volcano Fragment
-					case 348:
-					{
-						TF2Attrib_SetByDefIndex(melee,773,1.35); //single wep deploy time increased
-						TF2Attrib_SetByDefIndex(melee,199,0.8); //holster speed bonus
-					}
-					//Hot Hand
-					case 1181:
-					{
-						TF2Attrib_SetByDefIndex(melee,1,1.0); //damage penalty
-					}
-					//Third Degree
-					case 593:
-					{
-						TF2Attrib_SetByDefIndex(melee,1,0.75); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,5,1.2); //fire rate penalty
-						TF2Attrib_SetByDefIndex(melee,360,0.0); //damage all connected
-						TF2Attrib_SetByDefIndex(melee,547,0.8); //deploy speed bonus
-					}
-					//The Shahanshah
-					case 401:
-					{
-						TF2Attrib_SetByDefIndex(melee,547,0.75); //deploy speed bonus
-					}
-					//The Jag
-					case 329:
-					{
-						TF2Attrib_SetByDefIndex(melee,95,0.67); //repair rate decreased
-					}
-					//Gloves of Running Urgently
-					case 239,1084,1100:
-					{
-						g_holsterMel[iClient] = 1.5;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-					}
-					//Fists of Steel
-					case 331:
-					{
-						g_holsterMel[iClient] = 2.0;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-						TF2Attrib_SetByDefIndex(melee,853,1.0); //mult_patient_overheal_penalty_active
-						TF2Attrib_SetByDefIndex(melee,800,0.6); //patient overheal penalty
-						TF2Attrib_SetByDefIndex(melee,239,1.0); //ubercharge rate bonus for healer
-					}
-					//The Homewrecker
-					case 153,466:
-					{
-						TF2Attrib_SetByDefIndex(melee,128,1.0); //provide while active
-						TF2Attrib_SetByDefIndex(melee,205,0.7); //damage from range
-						TF2Attrib_SetByDefIndex(melee,252,0.5); //damage force reduction
-						g_holsterMel[iClient] = 1.6;
-						TF2Attrib_SetByDefIndex(melee,772,1.0); //single wep holster time increased
-					}
-					//The Amputator
-					case 304:
-					{
-						TF2Attrib_SetByDefIndex(melee,1,0.75); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,57,0.0); //health regen
-					}
-					//Pain Train
-					case 154:
-					{
-						TF2Attrib_SetByDefIndex(melee,412,1.1); //dmg taken increased
-						TF2Attrib_SetByDefIndex(melee,67,1.0); //dmg taken from bullets increased
-					}
-					//Scotsman's skullcutter
-					case 172:
-					{
-						switch(secondaryIndex)
-						{
-							case 59: //screen
-							{
-								TF2Attrib_SetByDefIndex(secondary,249,1.5*1.2); //shield recharge rate
-							}
-							case 131,1099,1144: //targe, turner
-							{
-								TF2Attrib_SetByDefIndex(secondary,249,1.2); //shield recharge rate
-							}
-						}
-					}
-					//Holiday Punch
-					case 656:
-					{
-						TF2Attrib_SetByDefIndex(melee,1,0.85); //damage penalty
-						TF2Attrib_SetByDefIndex(melee,6,0.8); //fire rate bonus
+						TF2Attrib_SetByDefIndex(secondary,249,1.2); //shield recharge rate
 					}
 				}
 			}
 		}
-
-		switch(watchIndex)
-		{
-			case 59: //dead ringer
-			{
-				TF2Attrib_SetByDefIndex(watch,35,1.25); //mult cloak meter regen rate
-				TF2Attrib_SetByDefIndex(watch,83,1.0); //cloak consume rate decreased
-				TF2Attrib_SetByDefIndex(watch,726,0.0); //cloak_consume_on_feign_death_activate
-			}
-			case 60: //cloak and dagger
-			{
-				TF2Attrib_SetByDefIndex(watch,83,0.825); //cloak consume rate decreased
-				TF2Attrib_SetByDefIndex(watch,253,-0.35); //mult cloak rate
-			}
-		}
-
+		
 		int building = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Building, true);
-		int pda = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_PDA, true);
-		int item1 = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Item1, true);
-		if(IsValidEdict(building))
-		{
-			TF2Attrib_SetByDefIndex(building,2029,1.0); //allowed in medieval mode
-		}
-		if(IsValidEdict(pda))
-		{
-			TF2Attrib_SetByDefIndex(pda,2029,1.0); //allowed in medieval mode
-		}
-		if(IsValidEdict(item1))
-		{
-			TF2Attrib_SetByDefIndex(item1,2029,1.0); //allowed in medieval mode
-		}
 		if(IS_MEDIEVAL)
 		{
 			if(building != GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon"))
@@ -1738,21 +978,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			}
 		}
 
-		int sapperIndex = -1;
-		if(building != -1) sapperIndex = GetEntProp(building, Prop_Send, "m_iItemDefinitionIndex");
-		//Red-Tape Recorder health
-		if(sapperIndex==810||sapperIndex==831)
-		{
-			TF2Attrib_SetByDefIndex(building,429,0.5); //sapper health penalty
-		}
-
 		//reset variables for client on spawn
-		if(meleeIndex != 349 && meleeIndex != 173 && meleeIndex != 813 && meleeIndex != 834)
-			g_meterMel[iClient] = 0.0;
-		if(secondaryIndex != 460)
-			g_meterSec[iClient] = 0.0;
-		if(primaryIndex != 811 && primaryIndex != 832 && primaryIndex != 772 && primaryIndex != 1178)
-			g_meterPri[iClient] = 0.0;
 		g_lastFire[iClient] = 0.0;
 		g_meleeStart[iClient] = 0.0;
 		g_lastHit[iClient] = 0.0;
@@ -1770,20 +996,863 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_syringeHit[iClient] = 0.0;
 		g_critHealReset[iClient] = 0.0;
 		
-		if(StrContains(event,"player_spawn") != -1) g_Fov[iClient] = GetEntProp(iClient, Prop_Send, "m_iFOV");
-		SetEntProp(iClient, Prop_Send, "m_iFOV", g_Fov[iClient]);
-		
 		TF2Attrib_SetByDefIndex(iClient,69,1.0); //set attr indexes for third degree
 		SetEntityGravity(iClient,1.0); //reset jetpack gravity;
 	}
 	return Plugin_Changed;
 }
 
-public Action TF2Items_OnGiveNamedItem(int iClient, char[] cName, int itemIndex, Handle &hItem)
+public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemIndex, int itemLevel, int itemQuality, int item)
 {
-	// PrintToChat(iClient,"%s %d",cName,itemIndex);
+	if(!IsFakeClient(iClient) || !g_bIsMVM)
+	{
+		TFClassType playerClass = TF2_GetPlayerClass(iClient);
+		// int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
+		int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
+		int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
+		// int watch = TF2Util_GetPlayerLoadoutEntity(iClient, 6, true);
+		int building = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Building, true);
+		int pda = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_PDA, true);
+		int item1 = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Item1, true);
+		if((IsValidEdict(building) && item==building)||(IsValidEdict(pda) && item==pda)||(IsValidEdict(item1) && item==item1))
+			TF2Attrib_SetByDefIndex(item,2029,1.0); //allowed in medieval mode
 
-	return Plugin_Continue; 
+		// if(item==primary && itemIndex != 811 && itemIndex != 832 && itemIndex != 772 && itemIndex != 1178)
+		g_meterPri[iClient] = 0.0;
+		// if(item==secondary && itemIndex != 460)
+		g_meterSec[iClient] = 0.0;
+		// if(item==melee && itemIndex != 349 && itemIndex != 173 && itemIndex != 813 && itemIndex != 834)
+		g_meterMel[iClient] = 0.0;
+		
+		//class-specific changes
+		switch(playerClass)
+		{
+			case TFClass_Sniper:
+			{
+				//modify sniper ammo
+				if(StrContains(cName,"sniperrifle",false) != -1) //ignore bows
+				{					
+					TF2Attrib_SetByDefIndex(item,77,0.625); //set max ammo
+					if(itemIndex != 526 && itemIndex != 30665) //set tracers
+					{ 
+						TF2Attrib_SetByDefIndex(item,647,1.0);
+						if(itemIndex != 230) TF2Attrib_SetByDefIndex(item,144,3.0);
+						if(itemIndex == 752) TF2Attrib_SetByDefIndex(item,51,0.0);
+					}
+					//set clip and reserve
+					int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+					int clip = 4; //default clip size
+					switch(itemIndex)
+					{
+						case 1098: //Classic clip bonus
+							clip = 6;
+						case 526, 30665: //Machina clip penalty
+							clip = 3;
+					}
+					if(g_bIsMVM) //mvm clip
+					{
+						Address addr = TF2Attrib_GetByName(item, "clip size bonus");
+						if(addr != Address_Null)
+						{
+							float value = TF2Attrib_GetValue(addr);
+							clip = RoundFloat(clip * value);
+						}
+					}
+					TF2Attrib_SetByDefIndex(item,303,clip+0.0); //set clip ammo
+					SetEntData(item, iAmmoTable, clip, 4, true);
+					SetEntProp(item, Prop_Send, "m_iClip1",clip);
+					int reserve = 16;
+					if(g_bIsMVM) //mvm reserve
+					{
+						Address addr = TF2Attrib_GetByName(item, "maxammo primary increased");
+						if(addr != Address_Null)
+						{
+							float value = TF2Attrib_GetValue(addr);
+							reserve = RoundFloat(reserve * value);
+						}
+					}
+					int primaryAmmo = GetEntProp(item, Prop_Send, "m_iPrimaryAmmoType");
+					SetEntProp(iClient, Prop_Data, "m_iAmmo", reserve, _, primaryAmmo);
+				}
+			}
+			case TFClass_Pyro: 
+			{
+				// modify pyro airblast
+				if((StrContains(cName,"flamethrower",false) != -1 || StrContains(cName,"fireball",false) != -1) && itemIndex!=594) //ignore phlog
+				{
+					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 100.0, 0);
+					SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 10);
+					float force = 1.0;
+					if(g_bIsMVM) //mvm force
+					{
+						Address addr = TF2Attrib_GetByName(item, "melee range multiplier");
+						if(addr != Address_Null)
+						{
+							float value = TF2Attrib_GetValue(addr);
+							force *= value;
+						}
+					}
+					TF2Attrib_SetByDefIndex(item,164,force); //airblast force
+				}
+			}
+			case TFClass_Spy:
+			{
+				if(StrContains(cName,"invis",false) != -1) //cloaking speed
+				{
+					TF2Attrib_SetByDefIndex(item,253,-0.25); //mult cloak rate
+					TF2Attrib_SetByDefIndex(item,221,0.75); //mult decloak rate
+				}
+				if(StrContains(cName,"revolver",false) != -1) TF2Attrib_SetByDefIndex(item,51,1.0); //revolver use hit locations
+			}
+			case TFClass_DemoMan:
+			{
+				switch(itemIndex) //shield speeds
+				{
+					//screen
+					case 59: TF2Attrib_SetByDefIndex(secondary,249,1.5); //shield recharge rate
+					//targe, turner
+					case 131,1099,1144: TF2Attrib_SetByDefIndex(secondary,249,1.0); //shield recharge rate
+				}
+				if(IsValidEdict(secondary) && (StrContains(cName,"saxxy",false) != -1 || StrContains(cName,"sword",false) != -1 || StrContains(cName,"katana",false) != -1 || StrContains(cName,"bottle",false) != -1 || StrContains(cName,"stickbomb",false) != -1))
+				{
+					int secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+					switch(secondaryIndex)
+					{
+						//screen
+						case 59: TF2Attrib_SetByDefIndex(secondary,249,1.5); //shield recharge rate
+						//targe, turner
+						case 131,1099,1144: TF2Attrib_SetByDefIndex(secondary,249,1.0); //shield recharge rate
+					}
+				}
+			}
+		}
+
+		switch(itemIndex) //melee crit changes
+		{
+			case 349,43,357,416,38,1000,457,813,834,307,132,266,327,404,482,1082,155,232,450,37,1003,447,173,310,413,171:
+			{
+				g_consecHits[iClient] = -1; //at -1, the consecutive hits won't be counted
+				TF2Attrib_SetByDefIndex(melee,15,0.0); //crit mod disabled
+			}
+			default:
+			{
+				if(TF2_GetPlayerClass(iClient) == TFClass_Spy) g_consecHits[iClient] = -1;
+				if(StrContains(cName,"saxxy",false) != -1 || StrContains(cName,"bat",false) != -1 || StrContains(cName,"fireaxe",false) != -1 || StrContains(cName,"shovel",false) != -1 || StrContains(cName,"bottle",false) != -1
+				|| StrContains(cName,"shovel",false) != -1 || StrContains(cName,"breakable_sign",false) != -1 || StrContains(cName,"slap",false) != -1 || StrContains(cName,"fists",false) != -1
+				|| StrContains(cName,"wrench",false) != -1 || StrContains(cName,"robot_arm",false) != -1 || StrContains(cName,"bonesaw",false) != -1 || StrContains(cName,"club",false) != -1)
+					g_consecHits[iClient] = 0; //allow random crits
+				else if(StrContains(cName,"sword",false) != -1 || StrContains(cName,"katana",false) != -1 || StrContains(cName,"knife",false) != -1 || StrContains(cName,"stickbomb",false) != -1)
+					g_consecHits[iClient] = -1; //no random crits
+			}
+		}
+
+		//weapon-specific changes
+		switch(itemIndex)
+		{
+			//PRIMARIES
+			//The Classic
+			case 1098:
+			{
+				TF2Attrib_SetByDefIndex(item,306,1.0); //headshots only at full charge
+				TF2Attrib_SetByDefIndex(item,4,1.5); //clip size bonus
+			}
+			//Brass Beast
+			case 312:
+			{
+				TF2Attrib_SetByDefIndex(item,738,0.75); //spinup damge resistance
+			}
+			//Huo-Long Heater
+			case 811,832:
+			{
+				TF2Attrib_SetByDefIndex(item,1,1.0); //damage penalty
+				TF2Attrib_SetByDefIndex(item,21,0.9); //damage penalty vs non-burning players
+				TF2Attrib_SetByDefIndex(item,795,1.15); //damage bonus vs burning
+				TF2Attrib_SetByDefIndex(item,431,3.0); //spinup ammo drain
+			}
+			//Baby Face's Blaster
+			case 772:
+			{
+				TF2Attrib_SetByDefIndex(item,733,2.0); //hype lost on damge
+				TF2Attrib_SetByDefIndex(item,419,50.0); //hype resets on jump
+				g_meterPri[iClient]=0.0;
+				SetEntPropFloat(iClient, Prop_Send, "m_flHypeMeter", g_meterPri[iClient]);
+			}
+			//Liberty Launcher
+			case 414:
+			{
+				TF2Attrib_SetByDefIndex(item,6,0.85); //firing speed bonus
+				TF2Attrib_SetByDefIndex(item,100,0.9); //Blast radius decreased
+			}
+			//The Pomson 6000
+			case 588:
+			{
+				TF2Attrib_SetByDefIndex(item,337,0.0); //victim loses medigun charge
+				TF2Attrib_SetByDefIndex(item,338,0.0); //victim loses cloak
+				TF2Attrib_SetByDefIndex(item,6,0.8); //firing speed bonus
+				TF2Attrib_SetByDefIndex(item,97,0.85); //reload speed bonus
+				float clip = 20.0;
+				if(g_bIsMVM) //mvm force
+				{
+					Address addr = TF2Attrib_GetByName(item, "clip size bonus");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						clip *= value;
+					}
+				}
+				TF2Attrib_SetByDefIndex(item,335,clip/20.0); //clip size upgrade
+				TF2Attrib_SetByDefIndex(item,103,1.5); //projectile speed
+			}
+			//The Back Scatter
+			case 1103:
+			{
+				//
+			}
+			//The Shortstop
+			case 220:
+			{
+				TF2Attrib_SetByDefIndex(item,97,0.9); //Reload time decreased
+			}
+			//Syringe Gun
+			case 17,204:
+			{
+				TF2Attrib_SetByDefIndex(item,280,9.0); //projectile override
+			}
+			//The Blutsauger
+			case 36:
+			{
+				TF2Attrib_SetByDefIndex(item,280,9.0); //projectile override
+				TF2Attrib_SetByDefIndex(item,3,0.63); //clip size penalty
+			}
+			//The Overdose
+			case 412:
+			{
+				TF2Attrib_SetByDefIndex(item,280,9.0); //projectile override
+				TF2Attrib_SetByDefIndex(item,1,0.8); //damage penalty
+				TF2Attrib_SetByDefIndex(item,792,1.25); //move speed bonus resource level
+			}
+			//The Phlogistinator
+			case 594:
+			{
+				//
+			}
+			//Natascha
+			case 41:
+			{
+				TF2Attrib_SetByDefIndex(item,32,0.0); //slow on hit
+				TF2Attrib_SetByDefIndex(item,738,1.0); //spinup damge resistance
+				TF2Attrib_SetByDefIndex(item,740,0.33); //reduced_healing_from_medics
+				float maxammo = 1.5;
+				if(g_bIsMVM)
+				{
+					Address addr = TF2Attrib_GetByName(item, "clip size bonus");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						maxammo += value/2.0;
+					}
+				}
+				TF2Attrib_SetByDefIndex(item,76,maxammo); //maxammo item increased
+			}
+			//Bazaar Bargain
+			case 402:
+			{
+				TF2Attrib_SetByDefIndex(item,41,1.5); //sniper charge
+				TF2Attrib_SetByDefIndex(item,268,1.0); //mult sniper charge penalty DISPLAY ONLY
+			}
+			//Loch-n-Load
+			case 308:
+			{
+				TF2Attrib_SetByDefIndex(item,97,0.8); //reload speed bonus
+				TF2Attrib_SetByDefIndex(item,3,0.5); //clip size penalty
+				TF2Attrib_SetByDefIndex(item,137,1.0); //dmg bonus vs buildings
+			}
+			//Sydney Sleeper
+			case 230:
+			{
+				TF2Attrib_SetByDefIndex(item,41,1.0); //sniper charge
+				TF2Attrib_SetByDefIndex(item,175,2.0); //jarate duration
+				TF2Attrib_SetByDefIndex(item,869,1.0); //crits become minicrits
+				TF2Attrib_SetByDefIndex(item,42,3.0); //weapon mode
+				TF2Attrib_SetByDefIndex(item,6,0.67); //fire rate bonus
+				SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
+			}
+			//Air Strike
+			case 1104:
+			{
+				TF2Attrib_SetByDefIndex(item,100,0.8); //Blast radius decreased
+			}
+			//The Machina
+			case 526,30665:
+			{
+				TF2Attrib_SetByDefIndex(item,304,1.0); //sniper full charge damage bonus
+				TF2Attrib_SetByDefIndex(item,266,1.0); //projectile penetration
+				TF2Attrib_SetByDefIndex(item,3,0.75); //clip size penalty
+				TF2Attrib_SetByDefIndex(item,41,0.75); //sniper charge
+				TF2Attrib_SetByDefIndex(item,269,1.0); //mod see enemy health
+			}
+			//Tomislav
+			case 424:
+			{
+				TF2Attrib_SetByDefIndex(item,87,0.8); //minigun spinup time decreased
+				TF2Attrib_SetByDefIndex(item,5,1.3); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,106,0.8); //spread bonus
+				TF2Attrib_SetByDefIndex(item,2,1.0); //damage bonus
+			}
+			//Loose Cannon
+			case 996:
+			{
+				TF2Attrib_SetByDefIndex(item,207,0.75); //blast dmg to self decreased
+			}
+			//Backburner
+			case 40,1146:
+			{
+				//
+			}
+			//Iron Bomber
+			case 1151:
+			{
+				TF2Attrib_SetByDefIndex(item,100,0.7); //blast radius decreased
+				TF2Attrib_SetByDefIndex(item,787,1.3); //fuse bonus
+				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+			}
+			//Crusader's Crossbow
+			case 305,1079:
+			{
+				int primaryAmmo = GetEntProp(item, Prop_Send, "m_iPrimaryAmmoType");
+				SetEntProp(iClient, Prop_Data, "m_iAmmo", 15, _, primaryAmmo);
+				TF2Attrib_SetByDefIndex(item,77,0.1); //maxammo item reduced
+			}
+			//Cow Mangler 5000
+			case 441:
+			{
+				//
+			}
+			//Soda Popper
+			case 448:
+			{
+				//
+			}
+			//Dragon's Fury
+			case 1178:
+			{
+				g_meterPri[iClient]=100.0;
+			}
+			//Iron Curtain
+			case 298:
+			{
+				TF2Attrib_SetByDefIndex(item,350,1.0); //ragdolls become ash
+				TF2Attrib_SetByDefIndex(item,106,0.001); //spread bonus
+				TF2Attrib_SetByDefIndex(item,809,1.0); //fixed_shot_pattern
+				TF2Attrib_SetByDefIndex(item,5,10.0); //firing speed bonus
+				TF2Attrib_SetByDefIndex(item,305,1.0); //sniper fires tracer
+				TF2Attrib_SetByDefIndex(item,2,8.0); //damage bonus
+				TF2Attrib_SetByDefIndex(item,45,0.25); //bullets per shot bonus
+				TF2Attrib_SetByDefIndex(item,77,0.2); //maxammo item reduced
+				TF2Attrib_SetByDefIndex(item,266,1.0); //projectile penetration
+				int primaryAmmo = GetEntProp(item, Prop_Send, "m_iPrimaryAmmoType");
+				SetEntProp(iClient, Prop_Data, "m_iAmmo", 40, _, primaryAmmo);
+			}
+
+			//SECONDARIES
+			//Panic Attack
+			case 1153:
+			{
+				TF2Attrib_SetByDefIndex(item,348,1.0); //firing speed bonus
+				TF2Attrib_SetByDefIndex(item,3,0.66); //clip size penalty
+				TF2Attrib_SetByDefIndex(item,1,0.85); //damage penalty
+				TF2Attrib_SetByDefIndex(item,808,0.0); //damage penalty
+				int clip = 4;
+				if(g_bIsMVM) //mvm clip
+				{
+					Address addr = TF2Attrib_GetByName(item, "clip size bonus");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						clip = RoundFloat(clip*value);
+					}
+				}
+				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+				SetEntData(item, iAmmoTable, clip, _, true);
+			}
+			//Flare Gun
+			case 39,1081:
+			{
+				TF2Attrib_SetByDefIndex(item,2029,1.0); //allowed in medieval mode
+			}
+			//Pretty Boy's Pocket Pistol
+			case 773:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.85); //damage penalty
+			}
+			//The Righteous Bison
+			case 442:
+			{
+				TF2Attrib_SetByDefIndex(item,2,2.5); //damage bonus
+				TF2Attrib_SetByDefIndex(item,6,0.8); //firing speed bonus
+				TF2Attrib_SetByDefIndex(item,103,1.5); //projectile speed
+			}
+			//The Enforcer
+			case 460:
+			{
+				// TF2Attrib_SetByDefIndex(item,410,1.3); //damage bonus while disguised
+				TF2Attrib_SetByDefIndex(item,221,0.25); //mult decloak rate
+				if(g_meterSec[iClient]<1000)
+					g_meterSec[iClient] = 0.0;
+			}
+			//Buffalo Steak Sandvich
+			case 311:
+			{
+				TF2Attrib_SetByDefIndex(item,798,1.0); //energy buff dmg taken multiplier
+				TF2Attrib_SetByDefIndex(item,252,1.0); //damage force reduction
+				TF2Attrib_SetByDefIndex(item,329,1.0); //airblast vulnerability multiplier
+			}
+			//Dalokohs Bar
+			case 159, 433:
+			{
+				//
+			}
+			//Jarate, Mad Milk
+			case 58,222,1121,1083,1105:
+			{
+				TF2Attrib_SetByDefIndex(item,2029,1.0); //allowed in medieval mode
+				TF2Attrib_SetByDefIndex(item,856,3.0); //meter type
+				TF2Attrib_SetByDefIndex(item,848,-1.0); //spawn doesn't affect resup
+				TF2Attrib_SetByDefIndex(item,784,0.25); //extinguish reduces cooldown
+				float time = 2.0;
+				if(g_bIsMVM) //mvm time
+				{
+					Address addr = TF2Attrib_GetByName(item, "melee range multiplier");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						time *= value;
+					}
+				}
+				TF2Attrib_SetByDefIndex(item,278,time); //recharge rate
+				if(itemIndex == 222 || itemIndex == 1121) //milk recharge
+				{
+					TF2Attrib_SetByDefIndex(item,2059,500.0); //damage to recharge
+				}
+				else //jarate splash reduction
+				{
+					TF2Attrib_SetByDefIndex(item,100,1.0); //Blast radius decreased
+				}
+			}
+			//The Gas Passer
+			case 1180:
+			{
+				TF2Attrib_SetByDefIndex(item,2029,1.0); //allowed in medieval mode
+				float time = 40.0;
+				if(g_bIsMVM) //mvm time
+				{
+					Address addr = TF2Attrib_GetByName(item, "melee bounds multiplier");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						time *= value;
+					}
+				}
+				TF2Attrib_SetByDefIndex(item,801,time); //recharge time
+				TF2Attrib_SetByDefIndex(item,2059,500.0); //damage to recharge
+				TF2Attrib_SetByDefIndex(item,74,1.0); //burn time
+				TF2Attrib_SetByDefIndex(item,875,1.0); //explode_on_ignite
+				TF2Attrib_SetByDefIndex(item,784,0.33); //extinguish reduces cooldown
+				TF2Attrib_SetByDefIndex(item,848,-1.0); //spawn doesn't affect resup
+			}
+			//The Razorback
+			case 57:
+			{
+				//set sheild status txt
+				SetEntProp(item, Prop_Data, "m_fEffects", 129);
+			}
+			//Cleaner's Carbine
+			case 751:
+			{
+				TF2Attrib_SetByDefIndex(item,106,0.75); //spread bonus
+				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,780,0.8333); //minicrit boost charge rate
+			}
+			//Thermal Thruster
+			case 1179:
+			{
+				TF2Attrib_SetByDefIndex(item,840,0.4); //holster anim time
+				TF2Attrib_SetByDefIndex(item,547,0.5); //deploy speed bonus
+				TF2Attrib_SetByDefIndex(item,400,1.0); //cannot pick up intelligence
+			}
+			//B.A.S.E. Jumper
+			case 1101:
+			{
+				TF2Attrib_SetByDefIndex(item,610,2.0); //increased air control
+				TF2Attrib_SetByDefIndex(item,135,0.75); //rocket jump damage reduction
+			}
+			//The Vaccinator
+			case 998:
+			{
+				TF2Attrib_SetByDefIndex(item,503,0.1); //bullet resist passive
+				TF2Attrib_SetByDefIndex(item,504,0.1); //blast resist passive
+				TF2Attrib_SetByDefIndex(item,505,0.1); //fire resist passive
+				TF2Attrib_SetByDefIndex(item,506,0.4); //bullet resist deployed
+				TF2Attrib_SetByDefIndex(item,507,0.4); //blast resist deployed
+				TF2Attrib_SetByDefIndex(item,508,0.4); //fire resist deployed
+			}
+			//Darwin's Danger Shield
+			case 231:
+			{
+				TF2Attrib_SetByDefIndex(item,26,15.0); //max health additive bonus
+				TF2Attrib_SetByDefIndex(item,60,1.0); //fire resistance
+				TF2Attrib_SetByDefIndex(item,527,0.0); //afterburn immunity
+				// SetEntityHealth(iClient,140);
+			}
+			//The Diamondback
+			case 525:
+			{
+				TF2Attrib_SetByDefIndex(item,296,0.0); //sapper kills collect crits
+				TF2Attrib_SetByDefIndex(item,1,1.0); //damage penalty
+				TF2Attrib_SetByDefIndex(item,3,0.67); //clip size penalty
+				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+				SetEntData(item, iAmmoTable, 4, _, true);
+			}
+			//Detonator
+			case 351:
+			{
+				TF2Attrib_SetByDefIndex(item,207,1.2); //self blast damge increased
+				TF2Attrib_SetByDefIndex(item,74,0.66); //weapon burn time reduced
+			}
+			//Short Circuit
+			case 528:
+			{
+				TF2Attrib_SetByDefIndex(item,2,2.0); //damage bonus
+				TF2Attrib_SetByDefIndex(item,614,1.0); //no metal from dispensers while active
+			}
+			//Buff Banner
+			case 129,1001:
+			{
+				TF2Attrib_SetByDefIndex(item,76,1.5); //maxammo primary increased
+			}
+			//Scorch Shot
+			case 740:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.85); //damage penalty
+				TF2Attrib_SetByDefIndex(item,59,1.0); //self dmg push force decreased
+				TF2Attrib_SetByDefIndex(item,74,0.66); //weapon burn time reduced
+			}
+			//Manmelter
+			case 595:
+			{
+				// 
+			}
+			//Quick-Fix
+			case 411:
+			{
+				TF2Attrib_SetByDefIndex(item,144,2.0); //set_weapon_mode
+			}
+			//Flying Guillotine
+			case 812,833:
+			{
+				float time = 1.6;
+				if(g_bIsMVM) //mvm time
+				{
+					Address addr = TF2Attrib_GetByName(item, "melee range multiplier");
+					if(addr != Address_Null)
+					{
+						float value = TF2Attrib_GetValue(addr);
+						time *= value;
+					}
+				}
+				TF2Attrib_SetByDefIndex(item,278,time); //mult_item_meter_charge_rate
+			}
+			//The Mantreads
+			case 444:
+			{
+				//
+			}
+			//The Winger
+			case 449:
+			{
+				TF2Attrib_SetByDefIndex(item,3,0.5); //clip size penalty
+				int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
+				SetEntData(item, iAmmoTable, 6, _, true);
+			}
+
+			//MELEES
+			//The Eyelander
+			case 132,266,482,1082:
+			{
+				int heads = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
+				float healthPenalty = heads*-15.0;
+				TF2Attrib_SetByDefIndex(item,125,healthPenalty-15);
+				TF2Attrib_SetByDefIndex(item,736,3.1); //speed boost on kill
+				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
+			}
+			//Sun-On-A-Stick
+			case 349:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.8); //damage penalty
+				TF2Attrib_SetByDefIndex(item,794,1.0); //dmg taken from fire reduced on active
+				SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",0.0,2); //set SOAS HEAT meter
+			}
+			//Southern Hospitality
+			case 155:
+			{
+				TF2Attrib_SetByDefIndex(item,61,1.0); //dmg taken from fire increased
+				TF2Attrib_SetByDefIndex(item,2043,0.8); //upgrade rate decrease
+			}
+			//Claidheamh Mor
+			case 327:
+			{
+				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,199,1/1.75); //holster speed bonus
+				TF2Attrib_SetByDefIndex(item,412,1.0); //dmg taken increased
+				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
+			}
+			//Persian Persuader
+			case 404:
+			{
+				TF2Attrib_SetByDefIndex(item,77,0.5); //maxammo primary reduced
+				TF2Attrib_SetByDefIndex(item,79,0.5); //maxammo secondary reduced
+				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
+			}
+			//The Ubersaw
+			case 37,1003:
+			{
+				TF2Attrib_SetByDefIndex(item,5,1.0); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,547,0.8); //deploy speed bonus
+				TF2Attrib_SetByDefIndex(item,852,1.25); //mult_dmgtaken_active
+				g_holsterMel[iClient] = 1.5;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+			}
+			//The Axtinguisher
+			case 38,1000:
+			{
+				g_holsterMel[iClient] = 1.35;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+			}
+			//Ullapool Caber
+			case 307:
+			{
+				TF2Attrib_SetByDefIndex(item,773,1.6); //deploy time increased
+			}
+			//Neon Annihilator
+			case 813, 834:
+			{
+				TF2Attrib_SetByDefIndex(item,146,0.0); //damage applies to sappers
+				TF2Attrib_SetByDefIndex(item,773,1.6); //deploy time increased
+				SetEntPropFloat(item, Prop_Send, "m_flLastFireTime",GetGameTime());
+			}
+			//Disciplinary Action
+			case 447:
+			{
+				TF2Attrib_SetByDefIndex(item,135,1.25); //rocket jump damage reduction
+			}
+			//Atomizer
+			case 450:
+			{
+				TF2Attrib_SetByDefIndex(item,138,1.0); //damage penalty vs players
+				TF2Attrib_SetByDefIndex(item,773,1.0); //single wep deploy time increased
+				g_holsterMel[iClient] = 1.6;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+			}
+			//The Vita-Saw
+			case 173:
+			{
+				TF2Attrib_SetByDefIndex(item,811,0.001); //ubercharge_preserved
+				TF2Attrib_SetByDefIndex(item,125,0.0); //max health additive penalty
+				TF2Attrib_SetByDefIndex(item,7,0.85); //heal rate penalty
+				TF2Attrib_SetByDefIndex(item,1,0.67); //damage penalty
+				TF2Attrib_SetByDefIndex(item,263,1.5); //melee_bounds_multiplier
+				if(GetClientHealth(iClient)<150)
+					SetEntityHealth(iClient,150);
+				g_meterMel[iClient] = GetEntProp(iClient, Prop_Send, "m_iHealPoints")+0.0;
+			}
+			//Warrior's Spirit
+			case 310:
+			{
+				TF2Attrib_SetByDefIndex(item,412,1.0); //dmg taken increased
+			}
+			//Half-Zatoichi
+			case 357:
+			{
+				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
+			}
+			//Solemn Vow
+			case 413:
+			{
+				TF2Attrib_SetByDefIndex(item,5,1.0); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,851,0.9); //mult_player_movespeed_active
+				TF2Attrib_SetByDefIndex(item,535,1.5); //damage force increase hidden
+			}
+			//Tribalman's shiv
+			case 171:
+			{
+				TF2Attrib_SetByDefIndex(item,149,8.0); //bleeding duration
+				TF2Attrib_SetByDefIndex(item,877,2.0); //speed boost on hit enemy
+				TF2Attrib_SetByDefIndex(item,797,1.0); //dmg pierces resists absorbs
+				TF2Attrib_SetByDefIndex(item,5,1.25); //fire rate penalty
+			}
+			//Killing Gloves of Boxing
+			case 43:
+			{
+				//
+			}
+			//Your Eternal Reward
+			case 225,574:
+			{
+				TF2Attrib_SetByDefIndex(item,34,1.0); //cloak drain penalty
+			}
+			//Conniver's Kunai
+			case 356:
+			{
+				TF2Attrib_SetByDefIndex(item,217,0.0); //sanguisuge
+				TF2Attrib_SetByDefIndex(item,125,-40.0); //max health additive penalty
+			}
+			//The Spy-cicle
+			case 649:
+			{
+				TF2Attrib_SetByDefIndex(item,359,0.0); //melts in fire
+				TF2Attrib_SetByDefIndex(item,361,0.0); //become fireproof on hit by fire
+				SetEntPropFloat(iClient, Prop_Send,"m_flItemChargeMeter",100.0,2); //durability meter
+				SetEntPropFloat(item, Prop_Send, "m_flLastFireTime",GetGameTime());
+			}
+			//The Equalizer
+			case 128:
+			{
+				TF2Attrib_SetByDefIndex(item,224,1.4); //increase damage below 50% HP
+				TF2Attrib_SetByDefIndex(item,225,0.6); //decrease damage above 50% HP
+			}
+			//Eviction Notice
+			case 426:
+			{
+				TF2Attrib_SetByDefIndex(item,128,1.0); //provide while active
+				TF2Attrib_SetByDefIndex(item,1,0.45); //damage penalty
+				TF2Attrib_SetByDefIndex(item,855,0.0); //max health drain
+				TF2Attrib_SetByDefIndex(item,852,1.25); //mult_dmgtaken_active
+				TF2Attrib_SetByDefIndex(item,547,0.8); //deploy speed bonus
+			}
+			//The Sandman
+			case 44:
+			{
+				TF2Attrib_SetByDefIndex(item,278,1.0); //effect bar recharge rate
+			}
+			//Candy Cane
+			case 317:
+			{
+				TF2Attrib_SetByDefIndex(item,65,1.0); //dmg taken from blast increased
+				TF2Attrib_SetByDefIndex(item,67,1.25); //dmg taken from bullet increased
+			}
+			//Fan O'War
+			case 355:
+			{
+				TF2Attrib_SetByDefIndex(item,199,0.75); //holster speed bonus
+			}
+			//Sharpened Volcano Fragment
+			case 348:
+			{
+				TF2Attrib_SetByDefIndex(item,773,1.35); //single wep deploy time increased
+				TF2Attrib_SetByDefIndex(item,199,0.8); //holster speed bonus
+			}
+			//Hot Hand
+			case 1181:
+			{
+				TF2Attrib_SetByDefIndex(item,1,1.0); //damage penalty
+			}
+			//Third Degree
+			case 593:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.75); //damage penalty
+				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,360,0.0); //damage all connected
+				TF2Attrib_SetByDefIndex(item,547,0.8); //deploy speed bonus
+			}
+			//The Shahanshah
+			case 401:
+			{
+				TF2Attrib_SetByDefIndex(item,547,0.75); //deploy speed bonus
+			}
+			//The Jag
+			case 329:
+			{
+				TF2Attrib_SetByDefIndex(item,95,0.67); //repair rate decreased
+			}
+			//Gloves of Running Urgently
+			case 239,1084,1100:
+			{
+				g_holsterMel[iClient] = 1.5;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+			}
+			//Fists of Steel
+			case 331:
+			{
+				g_holsterMel[iClient] = 2.0;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+				TF2Attrib_SetByDefIndex(item,853,1.0); //mult_patient_overheal_penalty_active
+				TF2Attrib_SetByDefIndex(item,800,0.6); //patient overheal penalty
+				TF2Attrib_SetByDefIndex(item,239,1.0); //ubercharge rate bonus for healer
+			}
+			//The Homewrecker
+			case 153,466:
+			{
+				TF2Attrib_SetByDefIndex(item,128,1.0); //provide while active
+				TF2Attrib_SetByDefIndex(item,205,0.7); //damage from range
+				TF2Attrib_SetByDefIndex(item,252,0.5); //damage force reduction
+				g_holsterMel[iClient] = 1.6;
+				TF2Attrib_SetByDefIndex(item,772,1.0); //single wep holster time increased
+			}
+			//The Amputator
+			case 304:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.75); //damage penalty
+				TF2Attrib_SetByDefIndex(item,57,0.0); //health regen
+			}
+			//Pain Train
+			case 154:
+			{
+				TF2Attrib_SetByDefIndex(item,412,1.1); //dmg taken increased
+				TF2Attrib_SetByDefIndex(item,67,1.0); //dmg taken from bullets increased
+			}
+			//Holiday Punch
+			case 656:
+			{
+				TF2Attrib_SetByDefIndex(item,1,0.85); //damage penalty
+				TF2Attrib_SetByDefIndex(item,6,0.8); //fire rate bonus
+			}
+			//Scotsman's skullcutter
+			case 172:
+			{
+				if(IsValidEdict(secondary))
+				{
+					int secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+					switch(secondaryIndex)
+					{
+						//screen
+						case 59: TF2Attrib_SetByDefIndex(secondary,249,1.5*1.2); //shield recharge rate
+						//targe, turner
+						case 131,1099,1144: TF2Attrib_SetByDefIndex(secondary,249,1.2); //shield recharge rate
+					}
+				}
+			}
+
+			//MISCS
+			//Dead Ringer
+			case 59:
+			{
+				TF2Attrib_SetByDefIndex(item,35,1.25); //mult cloak meter regen rate
+				TF2Attrib_SetByDefIndex(item,83,1.0); //cloak consume rate decreased
+				TF2Attrib_SetByDefIndex(item,726,0.0); //cloak_consume_on_feign_death_activate
+			}
+			//Cloak and Dagger
+			case 60:
+			{
+				TF2Attrib_SetByDefIndex(item,83,0.825); //cloak consume rate decreased
+				TF2Attrib_SetByDefIndex(item,253,-0.35); //mult cloak rate
+			}
+			//Red-Tape Recorder
+			case 810, 831:
+			{
+				TF2Attrib_SetByDefIndex(item,429,0.5); //sapper health penalty
+			}
+		}
+	}
 }
 
 public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadcast)
@@ -3111,19 +3180,19 @@ public void OnGameFrame()
 						{
 							case 311, 159, 433: //update buffalo and dalokohs healing
 							{
-								Address addr = TF2Attrib_GetByDefIndex(iClient,201);
-								if(addr != Address_Null)
-								{
-									float speed = TF2Attrib_GetValue(addr); //get eating speed
-									if(speed > 1.0 && g_condFlags[iClient] & TF_CONDFLAG_EATING)
-									{
-										if(!((clientFlags & FL_ONGROUND) == FL_ONGROUND) || !TF2_IsPlayerInCondition(iClient,TFCond_Taunting))
-										{
-											TF2Attrib_SetByDefIndex(iClient,201,1.0); //revert eating speed
-											g_condFlags[iClient] &= ~TF_CONDFLAG_EATING;
-										}
-									}
-								}
+								// Address addr = TF2Attrib_GetByDefIndex(iClient,201);
+								// if(addr != Address_Null)
+								// {
+								// 	// float speed = TF2Attrib_GetValue(addr); //get eating speed
+								// 	if(speed > 1.0 && g_condFlags[iClient] & TF_CONDFLAG_EATING)
+								// 	{
+								// 		if(!((clientFlags & FL_ONGROUND) == FL_ONGROUND) || !TF2_IsPlayerInCondition(iClient,TFCond_Taunting))
+								// 		{
+								// 			// TF2Attrib_SetByDefIndex(iClient,201,1.0); //revert eating speed
+								// 			g_condFlags[iClient] &= ~TF_CONDFLAG_EATING;
+								// 		}
+								// 	}
+								// }
 							}
 						}
 						switch(secondaryIndex)
@@ -4486,7 +4555,8 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					if(buttons & IN_ATTACK && curr == secondary && nextAtk<=(GetGameTime()+0.06)) //setup steak and chocolate heals
 					{
 						g_condFlags[iClient] |= TF_CONDFLAG_EATING;
-						TF2Attrib_SetByDefIndex(iClient,201,1.7); //revert eating speed
+						TF2Attrib_AddCustomPlayerAttribute(iClient, "gesture speed increase", 1.7, 2.0);
+						// TF2Attrib_SetByDefIndex(iClient,201,1.7); //revert eating speed
 					}
 				}
 				//KGB start timer
@@ -5022,7 +5092,8 @@ public Action PlayerListener(int iClient, const char[] command, int argc)
 			(StrEqual(current,"tf_weapon_lunchbox") || StrEqual(current,"Lunch Box")))
 			{
 				g_condFlags[iClient] |= TF_CONDFLAG_EATING;
-				TF2Attrib_SetByDefIndex(iClient,201,1.7); //revert eating speed
+				TF2Attrib_AddCustomPlayerAttribute(iClient, "gesture speed increase", 1.7, 2.0);
+				// TF2Attrib_SetByDefIndex(iClient,201,1.7); //revert eating speed
 			}
 		}
 		case TFClass_DemoMan:
