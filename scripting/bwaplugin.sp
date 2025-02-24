@@ -612,21 +612,27 @@ public Action BotWeapons(Handle timer, int iClient)
 		if(IsFakeClient(iClient))
 		{
 			int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
-			int primaryIndex = -1;
-			if(primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
 			int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
-			int secondaryIndex = -1;
-			if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
 			int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
-			int meleeIndex = -1;
-			if(melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 			char class1[64],class2[64],class3[64];
-			GetEntityClassname(primary,class1,64);
-			TF2Items_OnGiveNamedItem_Post(iClient, class1, primaryIndex, GetEntProp(primary, Prop_Send, "m_iEntityLevel"), GetEntProp(primary, Prop_Send, "m_iEntityQuality"), primary);
-			GetEntityClassname(secondary,class2,64);
-			TF2Items_OnGiveNamedItem_Post(iClient, class2, secondaryIndex, GetEntProp(secondary, Prop_Send, "m_iEntityLevel"), GetEntProp(secondary, Prop_Send, "m_iEntityQuality"), secondary);
-			GetEntityClassname(melee,class3,64);
-			TF2Items_OnGiveNamedItem_Post(iClient, class3, meleeIndex, GetEntProp(melee, Prop_Send, "m_iEntityLevel"), GetEntProp(melee, Prop_Send, "m_iEntityQuality"), melee);
+			if(IsValidEdict(primary))
+			{
+				int primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
+				GetEntityClassname(primary,class1,64);
+				TF2Items_OnGiveNamedItem_Post(iClient, class1, primaryIndex, GetEntProp(primary, Prop_Send, "m_iEntityLevel"), GetEntProp(primary, Prop_Send, "m_iEntityQuality"), primary);
+			}
+			if(IsValidEdict(secondary))
+			{
+				int secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
+				GetEntityClassname(secondary,class2,64);
+				TF2Items_OnGiveNamedItem_Post(iClient, class2, secondaryIndex, GetEntProp(secondary, Prop_Send, "m_iEntityLevel"), GetEntProp(secondary, Prop_Send, "m_iEntityQuality"), secondary);
+			}
+			if(IsValidEdict(melee))
+			{
+				int meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
+				GetEntityClassname(melee,class3,64);
+				TF2Items_OnGiveNamedItem_Post(iClient, class3, meleeIndex, GetEntProp(melee, Prop_Send, "m_iEntityLevel"), GetEntProp(melee, Prop_Send, "m_iEntityQuality"), melee);
+			}
 		}
 	}
 	return Plugin_Changed;
@@ -819,7 +825,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			case 57:
 			{
 				// //set sheild status txt
-				// SetEntProp(secondary, Prop_Data, "m_fEffects", 129);
+				SetEntProp(secondary, Prop_Data, "m_fEffects", 129);
 			}
 			//The Diamondback
 			case 525:
@@ -831,7 +837,13 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		// add 3-hit crit combo to (most) melee weapons - exemptions including swords & knives or those with "no random crits" and/or situational (mini)crits; KGB, SoaS, Skullcutter, atomizer made exempt
 		switch(meleeIndex)
 		{
-			case 404: //persian persuader
+			//The Eyelander
+			case 132,266,482,1082:
+			{
+				RequestFrame(updateHeads,iClient);
+			}
+			//persian persuader
+			case 404:
 			{
 				switch(primaryIndex)
 				{
@@ -904,6 +916,16 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 					{
 						TF2Attrib_SetByDefIndex(secondary,249,1.2); //shield recharge rate
 					}
+				}
+			}
+			//Conniver's Kunai
+			case 356:
+			{
+				TF2Attrib_SetByDefIndex(melee,217,0.0); //sanguisuge
+				if(strcmp(event,"player_spawn") == 0)
+				{
+					TF2Attrib_SetByDefIndex(melee,125,-40.0); //max health additive penalty
+					SetEntityHealth(iClient,85);
 				}
 			}
 		}
@@ -1004,12 +1026,21 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 
 public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemIndex, int itemLevel, int itemQuality, int item)
 {
-	if(!IsFakeClient(iClient) || !g_bIsMVM)
+	bool notDisguise = true;
+	if(StrContains(cName,"wearable",false) != -1)
+	{
+		if(GetEntProp(item, Prop_Send, "m_bDisguiseWearable")) notDisguise = false;
+	}
+	else
+	{
+		if(GetEntProp(item, Prop_Send, "m_bDisguiseWeapon")) notDisguise = false;
+	}
+	if((!IsFakeClient(iClient) || !g_bIsMVM) && notDisguise)
 	{
 		TFClassType playerClass = TF2_GetPlayerClass(iClient);
 		// int primary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Primary, true);
 		int secondary = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Secondary, true);
-		int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
+		// int melee = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Melee, true);
 		// int watch = TF2Util_GetPlayerLoadoutEntity(iClient, 6, true);
 		int building = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_Building, true);
 		int pda = TF2Util_GetPlayerLoadoutEntity(iClient, TFWeaponSlot_PDA, true);
@@ -1023,7 +1054,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 		g_meterSec[iClient] = 0.0;
 		// if(item==melee && itemIndex != 349 && itemIndex != 173 && itemIndex != 813 && itemIndex != 834)
 		g_meterMel[iClient] = 0.0;
-		
+
 		//class-specific changes
 		switch(playerClass)
 		{
@@ -1132,7 +1163,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 349,43,357,416,38,1000,457,813,834,307,132,266,327,404,482,1082,155,232,450,37,1003,447,173,310,413,171:
 			{
 				g_consecHits[iClient] = -1; //at -1, the consecutive hits won't be counted
-				TF2Attrib_SetByDefIndex(melee,15,0.0); //crit mod disabled
+				TF2Attrib_SetByDefIndex(item,15,0.0); //crit mod disabled
 			}
 			default:
 			{
@@ -1579,11 +1610,10 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//The Eyelander
 			case 132,266,482,1082:
 			{
-				int heads = GetEntProp(iClient, Prop_Send, "m_iDecapitations");
-				float healthPenalty = heads*-15.0;
-				TF2Attrib_SetByDefIndex(item,125,healthPenalty-15);
 				TF2Attrib_SetByDefIndex(item,736,3.1); //speed boost on kill
 				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
+				TF2Attrib_SetByDefIndex(item,125,-15.0); //max health additive penalty
+				RequestFrame(updateHeads,iClient);
 			}
 			//Sun-On-A-Stick
 			case 349:
@@ -1918,13 +1948,8 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 							int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
 							int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
 							SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
-							DataPack pack = new DataPack();
-							pack.Reset();
-							pack.WriteCell(attacker);
-							pack.WriteCell(heads+1+vicheads);
-							pack.WriteCell(0);
-							RequestFrame(updateHeads,pack);
-							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.0);
+							RequestFrame(updateHeads,attacker);
+							TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
 						}
 						case 357: //half-zatoichi
 						{
@@ -2045,13 +2070,8 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 						int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
 						int vicheads = GetEntProp(victim, Prop_Send, "m_iDecapitations");
 						SetEntProp(attacker, Prop_Send, "m_iDecapitations",heads+1+vicheads);
-						DataPack pack = new DataPack();
-						pack.Reset();
-						pack.WriteCell(attacker);
-						pack.WriteCell(heads+1+vicheads);
-						pack.WriteCell(0);
-						RequestFrame(updateHeads,pack);
-						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.0);
+						RequestFrame(updateHeads,attacker);
+						TF2_AddCondition(attacker,TFCond_SpeedBuffAlly,3.1);
 					}
 					if(meleeIndex==357) //half-zatoichi on-kill
 					{
@@ -2139,14 +2159,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 				}
 				case 132,266,482,1082: //eyelander
 				{
-					//adjust max health on kill
-					int heads = GetEntProp(attacker, Prop_Send, "m_iDecapitations");
-					DataPack pack = new DataPack();
-					pack.Reset();
-					pack.WriteCell(attacker);
-					pack.WriteCell(heads);
-					pack.WriteCell(0);
-					RequestFrame(updateHeads,pack);
+					RequestFrame(updateHeads,attacker);
 				}
 				case 356: //Kunai health on kill
 				{
@@ -3907,10 +3920,6 @@ public Action TF2_OnAddCond(int iClient,TFCond &condition,float &time, int &prov
 				TF2Attrib_SetByDefIndex(secondary,252,0.25); //damage force reduction
 				TF2Attrib_SetByDefIndex(secondary,329,0.25); //airblast vulnerability multiplier
 				g_meterSec[iClient] = 0.0;
-			}
-			if(condition == TFCond_RestrictToMelee)
-			{
-				time = 12.0;
 			}
 			if(condition == TFCond_CritOnKill && time == 6.0)
 			{
@@ -6635,6 +6644,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 						{
 							TF2_AddCondition(victim,TFCond_SpeedBuffAlly,3.0);
 							damage = currHP-1.0;
+							SetEntPropFloat(victim, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
 							SetEntProp(secondary, Prop_Data, "m_fEffects",161); //break shield?
 						}
 					}
@@ -7405,19 +7415,16 @@ public Action updateGlow(Handle timer, int client)
 	return Plugin_Continue;
 }
 
-public void updateHeads(DataPack pack)
+public void updateHeads(int client)
 {
-	pack.Reset();
-	int client = pack.ReadCell();
-	int heads = pack.ReadCell();
-	int respawn = pack.ReadCell();
+	int heads = GetEntProp(client, Prop_Send, "m_iDecapitations");
+	if(TF2_IsPlayerInCondition(client,TFCond_SpawnOutline)) heads = 0;
 	int melee = TF2Util_GetPlayerLoadoutEntity(client, TFWeaponSlot_Melee, true);
 	if(heads>4)
 		heads = 4; //cap heads 
 	float healthPenalty = heads*-15.0;
 	TF2Attrib_SetByDefIndex(melee,125,healthPenalty-15.0);
-	if(respawn==1)
-		TF2Util_TakeHealth(client,200.0);
+	if(TF2_IsPlayerInCondition(client,TFCond_SpawnOutline)) TF2Util_TakeHealth(client,200.0);
 }
 
 public void updateShield(DataPack pack)
