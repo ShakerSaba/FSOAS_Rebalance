@@ -1089,7 +1089,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 							clip = RoundFloat(clip * value);
 						}
 					}
-					TF2Attrib_SetByDefIndex(item,303,clip+0.0); //set clip ammo
+					TF2Attrib_SetByDefIndex(item,303,4.0); //set base clip ammo
 					SetEntData(item, iAmmoTable, clip, 4, true);
 					SetEntProp(item, Prop_Send, "m_iClip1",clip);
 					int reserve = 16;
