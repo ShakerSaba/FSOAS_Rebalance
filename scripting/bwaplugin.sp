@@ -1206,7 +1206,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			{
 				TF2Attrib_SetByDefIndex(item,306,1.0); //headshots only at full charge
 				// TF2Attrib_SetByDefIndex(item,4,1.5); //clip size bonus
-				TF2Attrib_SetByDefIndex(item,75,2.0); //aiming movespeed increased
+				TF2Attrib_SetByDefIndex(item,75,1.5); //aiming movespeed increased
 			}
 			//Brass Beast
 			case 312:
@@ -1744,7 +1744,6 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 				TF2Attrib_SetByDefIndex(item,149,8.0); //bleeding duration
 				TF2Attrib_SetByDefIndex(item,877,2.0); //speed boost on hit enemy
 				TF2Attrib_SetByDefIndex(item,797,1.0); //dmg pierces resists absorbs
-				TF2Attrib_SetByDefIndex(item,5,1.25); //fire rate penalty
 			}
 			//Killing Gloves of Boxing
 			case 43:
@@ -1875,6 +1874,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//Scotsman's skullcutter
 			case 172:
 			{
+				g_consecHits[iClient] = 0; //allow random crits
 				if(IsValidEdict(secondary))
 				{
 					int secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
@@ -1892,7 +1892,9 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			{
 				TF2Attrib_SetByDefIndex(item,1,0.75); //damage penalty
 				TF2Attrib_SetByDefIndex(item,218,1.0); //mark for death
-				TF2Attrib_SetByDefIndex(item,773,1.5); //deploy time increased
+				TF2Attrib_SetByDefIndex(item,773,1.35); //deploy time increased
+				TF2Attrib_SetByDefIndex(item,412,1.0); //dmg taken increased
+				TF2Attrib_SetByDefIndex(item,5,1.3); //firing speed penalty
 			}
 
 			//MISCS
@@ -3368,7 +3370,7 @@ public void OnGameFrame()
 							{
 								int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
                            		int seq = GetEntProp(view, Prop_Send, "m_nSequence");
-								if(current==secondary && seq != 27)
+								if(current==secondary && (seq != 27 || g_meterSec[iClient]<=0))
 								{
 									SetEntPropFloat(secondary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime()+0.3);
 								}
@@ -3376,10 +3378,15 @@ public void OnGameFrame()
 								{
 									g_meterSec[iClient] = g_meterSec[iClient]+0.015 > 0 ? 0.0 : g_meterSec[iClient]+0.015;
 								}
-								else if(g_meterSec[iClient]>=2.5 && g_condFlags[iClient] & TF_CONDFLAG_INFIRE == TF_CONDFLAG_INFIRE)
+								else if(g_meterSec[iClient]>=2.0 && g_condFlags[iClient] & TF_CONDFLAG_INFIRE == TF_CONDFLAG_INFIRE)
 								{
-									g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
 									g_meterSec[iClient] = -0.5;
+									g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
+								}
+								else if(g_meterSec[iClient]>=2.1)
+								{
+									g_meterSec[iClient] = -0.5;
+									g_condFlags[iClient] &= ~TF_CONDFLAG_INFIRE;
 								}
 							}
 						}
@@ -4729,28 +4736,31 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
                     if(g_meterSec[iClient]>=0 && GetEntProp(iClient, Prop_Data, "m_iAmmo", 4, 3) >= 65)
                     {
                         if(buttons & IN_ATTACK2 == IN_ATTACK2 && (!(g_TrueLastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2) || g_meterSec[iClient]>0))
-                        {
-                            if(g_meterSec[iClient]==0.0)
-                            {
-                                g_meterSec[iClient] = 0.015;
+						{
+							if(g_meterSec[iClient]==0.0)
+							{
+								g_meterSec[iClient] = 0.015;
 								TF2_AddCondition(iClient,TFCond_FocusBuff);
-                                EmitSoundToClient(iClient,"weapons/cow_mangler_over_charge.wav",iClient,SNDCHAN_VOICE_BASE);
-                            }
-                            if(g_meterSec[iClient]>0) g_meterSec[iClient] += 0.015;
+								EmitSoundToClient(iClient,"weapons/cow_mangler_over_charge.wav",iClient,SNDCHAN_VOICE_BASE);
+							}
+							if(g_meterSec[iClient]>0) g_meterSec[iClient] += 0.015;
 							weapon = 0;
+							g_TrueLastButtons[iClient] = buttons;
 							buttons &= ~IN_ATTACK;
-                        }
-                        if(!(g_condFlags[iClient] & TF_CONDFLAG_INFIRE == TF_CONDFLAG_INFIRE) && g_TrueLastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2 && (!(buttons & IN_ATTACK2 == IN_ATTACK2) || g_meterSec[iClient] >= 1.9) && g_meterSec[iClient] < 2.0 && g_meterSec[iClient]!=0.0)
-                        {
+							buttonsModified = true;
+						}
+						if(g_TrueLastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2 && (!(buttons & IN_ATTACK2 == IN_ATTACK2) || g_meterSec[iClient] >= 1.9) && g_meterSec[iClient] < 2.0 && g_meterSec[iClient]!=0.0)
+						{
 							g_condFlags[iClient] |= TF_CONDFLAG_INFIRE;
 							TF2_RemoveCondition(iClient,TFCond_FocusBuff);
-                            SetEntProp(view, Prop_Send, "m_nSequence",27);
-                            EmitSoundToClient(iClient,"weapons/barret_arm_shot.wav",iClient,SNDCHAN_VOICE_BASE);
-                            SetEntPropFloat(secondary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime());
+							SetEntProp(view, Prop_Send, "m_nSequence",27);
+							EmitSoundToClient(iClient,"weapons/barret_arm_shot.wav",iClient,SNDCHAN_VOICE_BASE);
+							SetEntPropFloat(secondary, Prop_Send, "m_flNextSecondaryAttack",GetGameTime());
+							SetEntPropFloat(secondary, Prop_Send, "m_flNextPrimaryAttack",GetGameTime()+0.5);
 							g_TrueLastButtons[iClient] = buttons;
-                            buttons |= IN_ATTACK2;
+							buttons |= IN_ATTACK2;
 							buttonsModified = true;
-                        }
+						}
                     }
 					else if(GetEntProp(iClient, Prop_Data, "m_iAmmo", 4, 3) < 65 && buttons & IN_ATTACK2 == IN_ATTACK2 && !(g_LastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2))
 					{
@@ -7646,6 +7656,7 @@ public Action updateRing(Handle timer, DataPack pack)
 	GetEntPropVector(victim, Prop_Send, "m_vecOrigin", victimPos);
 	for (int i = 1 ; i <= MaxClients ; i++)
 	{
+		bool hit = false;
 		if(IsValidClient(i,false) && i!=victim && !(g_condFlags[i] & TF_CONDFLAG_HEATER))
 		{
 			if(IsPlayerAlive(i) && GetClientTeam(attacker)!=GetClientTeam(i))
@@ -7654,11 +7665,26 @@ public Action updateRing(Handle timer, DataPack pack)
 				float dist = GetVectorDistance(victimPos,targetPos);
 				if(victim != i && dist<=190 && TF2_GetClientTeam(i) != TF2_GetClientTeam(attacker))
 				{
-					SDKHooks_TakeDamage(i, attacker, attacker, 5.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos, false);
-					if(TF2_GetPlayerClass(i) != TFClass_Pyro)
+					Handle hndl = TR_TraceRayFilterEx(targetPos, victimPos, MASK_SOLID, RayType_EndPoint, TraceFilter, i);
+					if(TR_DidHit() == false)
+						hit = true;
+					else
 					{
-						TF2Util_SetPlayerBurnDuration(i,4.0);
-						TF2_AddCondition(i,TFCond_HealingDebuff,4.0);
+						int vic = TR_GetEntityIndex(hndl);
+						char[] class = new char[64];
+						if(IsValidEdict(vic)) GetEdictClassname(vic, class, 64);
+						
+						if(StrEqual(class,"func_respawnroomvisualizer") || !IsValidEdict(vic))
+							hit = true;
+					}
+					if(hit)
+					{
+						SDKHooks_TakeDamage(i, attacker, attacker, 5.0, DMG_IGNITE | DMG_BURN, primary, NULL_VECTOR, targetPos, false);
+						if(TF2_GetPlayerClass(i) != TFClass_Pyro)
+						{
+							TF2Util_SetPlayerBurnDuration(i,4.0);
+							TF2_AddCondition(i,TFCond_HealingDebuff,4.0);
+						}
 					}
 				}
 			}
@@ -9411,6 +9437,7 @@ void orbSpawn(int entity)
 		TeleportEntity(entity,_,_,vel);
 		// destroy short circuit orb much sooner
 		CreateTimer(0.5+0.5*(g_meterSec[owner]/1.9),KillOrb,entity);
+		SetEntPropFloat(weapon, Prop_Send, "m_flNextSecondaryAttack",GetGameTime()+0.6);
 		g_meterSec[owner] = 2.5;
 	}
 }

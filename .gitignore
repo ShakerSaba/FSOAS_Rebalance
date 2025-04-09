@@ -6,3 +6,5 @@ plugins/automessager.smx
 plugins/sm_chaosmvm.smx
 .vscode/settings.json
 plugins/thewhat_rebalance.smx
+scripting/bwaplugin_fools.sp
+scripting/bwaplugin_fools2.sp
