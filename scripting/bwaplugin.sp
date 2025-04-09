@@ -526,32 +526,6 @@ public void OnEntityCreated(int iEnt, const char[] classname)
 
 public Action LogGameMessage(const char[] message)
 {
-	// if(StrContains(message,"player_extinguished") != -1 && (StrContains(message,"tf_weapon_jar") != -1 || StrContains(message,"tf_weapon_flaregun_revenge") != -1))
-	// {
-	// 	int idStartPos = StrContains(message,"<")+1;
-	// 	int idEndPos = StrContains(message,"[U:1:") - 2;
-	// 	if(idEndPos < 0)
-	// 		idEndPos = StrContains(message,"<BOT>") - 1;
-	// 	char[] id = new char[MAX_NAME_LENGTH];
-	// 	strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
-	// 	id[idEndPos-idStartPos] = 0;
-	// 	int user = GetClientOfUserId(StringToInt(id));
-	// 	int secondary = TF2Util_GetPlayerLoadoutEntity(user, TFWeaponSlot_Secondary, true);
-	// 	int secondaryIndex = -1;
-	// 	if(secondary>0) secondaryIndex = GetEntProp(secondary, Prop_Send, "m_iItemDefinitionIndex");
-	// 	switch(secondaryIndex)
-	// 	{
-	// 		case 1180: //gas passer
-	// 			SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 33.333, 1);
-	// 		case 58,222,1121,1083,1105: //milk and jarate
-	// 		{
-	// 			SetEntPropFloat(secondary, Prop_Send, "m_flLastFireTime",GetGameTime()+26.5);
-	// 			SetEntPropFloat(secondary, Prop_Send, "m_flEffectBarRegenTime",GetGameTime()+26.5);
-	// 		}
-	// 	}
-	// 	return Plugin_Changed;
-	// }
-	// else
 	if(StrContains(message,"player_extinguished") && (StrContains(message,"tf_weapon_flamethrower") != -1 || StrContains(message,"tf_weapon_rocketlauncher_fireball") != -1))
 	{
 		int idStartPos = StrContains(message,"<")+1;
@@ -1319,7 +1293,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 308:
 			{
 				TF2Attrib_SetByDefIndex(item,96,1.35); //Reload time increased
-				TF2Attrib_SetByDefIndex(item,6,0.75); //fire rate bonus
+				TF2Attrib_SetByDefIndex(item,6,0.75); //firing speed bonus
 				TF2Attrib_SetByDefIndex(item,3,0.5); //clip size penalty
 				TF2Attrib_SetByDefIndex(item,137,1.0); //dmg bonus vs buildings
 			}
@@ -1330,7 +1304,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 				TF2Attrib_SetByDefIndex(item,175,2.0); //jarate duration
 				TF2Attrib_SetByDefIndex(item,869,1.0); //crits become minicrits
 				TF2Attrib_SetByDefIndex(item,42,3.0); //weapon mode
-				TF2Attrib_SetByDefIndex(item,6,0.67); //fire rate bonus
+				TF2Attrib_SetByDefIndex(item,6,0.67); //firing speed bonus
 				SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 0.0, 1);
 			}
 			//Air Strike
@@ -1351,7 +1325,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 424:
 			{
 				TF2Attrib_SetByDefIndex(item,87,0.8); //minigun spinup time decreased
-				TF2Attrib_SetByDefIndex(item,5,1.3); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.3); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,106,0.8); //spread bonus
 				TF2Attrib_SetByDefIndex(item,2,1.0); //damage bonus
 			}
@@ -1370,7 +1344,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			{
 				TF2Attrib_SetByDefIndex(item,100,0.7); //blast radius decreased
 				TF2Attrib_SetByDefIndex(item,787,1.3); //fuse bonus
-				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.2); //firing speed penalty
 			}
 			//Crusader's Crossbow
 			case 305,1079:
@@ -1528,7 +1502,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 751:
 			{
 				TF2Attrib_SetByDefIndex(item,106,0.75); //spread bonus
-				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.2); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,780,0.8333); //minicrit boost charge rate
 			}
 			//Thermal Thruster
@@ -1658,7 +1632,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//Claidheamh Mor
 			case 327:
 			{
-				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.2); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,199,1/1.75); //holster speed bonus
 				TF2Attrib_SetByDefIndex(item,412,1.0); //dmg taken increased
 				TF2Attrib_SetByDefIndex(item,781,1.0); //is_a_sword
@@ -1673,7 +1647,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//The Ubersaw
 			case 37,1003:
 			{
-				TF2Attrib_SetByDefIndex(item,5,1.0); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.0); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,547,0.8); //deploy speed bonus
 				TF2Attrib_SetByDefIndex(item,852,1.25); //mult_dmgtaken_active
 				g_holsterMel[iClient] = 1.5;
@@ -1735,7 +1709,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//Solemn Vow
 			case 413:
 			{
-				TF2Attrib_SetByDefIndex(item,5,1.0); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.0); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,851,0.9); //mult_player_movespeed_active
 			}
 			//Tribalman's shiv
@@ -1815,7 +1789,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 593:
 			{
 				TF2Attrib_SetByDefIndex(item,1,0.75); //damage penalty
-				TF2Attrib_SetByDefIndex(item,5,1.2); //fire rate penalty
+				TF2Attrib_SetByDefIndex(item,5,1.2); //firing speed penalty
 				TF2Attrib_SetByDefIndex(item,360,0.0); //damage all connected
 				TF2Attrib_SetByDefIndex(item,547,0.8); //deploy speed bonus
 			}
@@ -1869,7 +1843,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			case 656:
 			{
 				TF2Attrib_SetByDefIndex(item,1,0.85); //damage penalty
-				TF2Attrib_SetByDefIndex(item,6,0.8); //fire rate bonus
+				TF2Attrib_SetByDefIndex(item,6,0.8); //firing speed bonus
 			}
 			//Scotsman's skullcutter
 			case 172:
@@ -2791,9 +2765,7 @@ public void OnGameFrame()
 							}
 							case 812,833: //flying guillotine
 							{
-								float time = GetGameTime();
 								float regen = GetEntPropFloat(secondary,Prop_Send,"m_flEffectBarRegenTime");
-								float last = GetEntPropFloat(secondary,Prop_Send,"m_flLastFireTime");
 								if(regen!=g_meterSec[iClient])
 								{
 									if(regen>g_meterSec[iClient]) g_meterSec[iClient] = regen;
@@ -2900,7 +2872,7 @@ public void OnGameFrame()
 								if(g_bIsMVM)
 								{
 									Address addr = TF2Attrib_GetByName(primary, "mult airblast refire time");
-									if(primaryIndex == 1178) addr = TF2Attrib_GetByName(primary, "fire rate bonus");
+									if(primaryIndex == 1178) addr = TF2Attrib_GetByName(primary, "firing speed bonus");
 									if(addr != Address_Null)
 									{
 										float value = TF2Attrib_GetValue(addr);
@@ -2939,14 +2911,14 @@ public void OnGameFrame()
 							SetHudTextParams(-0.1, -0.16, 0.5, 255, 255, 255, 255);
 							ShowHudText(iClient,2,"%.0f%% PRESSURE",meter);
 						}
-						if(primaryIndex==1178) //dragon's fury mvm fire rate
+						if(primaryIndex==1178) //dragon's fury mvm firing speed
 						{
 							if(g_bIsMVM)
 							{
 								float rate = GetEntPropFloat(primary, Prop_Send, "m_flRechargeScale");
 								float newRate = rate;
 								float value = 1.0;
-								Address addr = TF2Attrib_GetByName(primary, "fire rate bonus");
+								Address addr = TF2Attrib_GetByName(primary, "firing speed bonus");
 								if(addr != Address_Null)
 								{
 									value = TF2Attrib_GetValue(addr);
@@ -3544,7 +3516,7 @@ public void OnGameFrame()
 								if(primaryIndex == 230 || g_bIsMVM) //sleeper
 								{
 									float value = 1.0;
-									Address addr = TF2Attrib_GetByName(primary, "fire rate bonus");
+									Address addr = TF2Attrib_GetByName(primary, "firing speed bonus");
 									if(addr != Address_Null)
 									{
 										value = TF2Attrib_GetValue(addr);
@@ -4762,7 +4734,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 							buttonsModified = true;
 						}
                     }
-					else if(GetEntProp(iClient, Prop_Data, "m_iAmmo", 4, 3) < 65 && buttons & IN_ATTACK2 == IN_ATTACK2 && !(g_LastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2))
+					else if(GetEntProp(iClient, Prop_Data, "m_iAmmo", 4, 3) < 65 && buttons & IN_ATTACK2 == IN_ATTACK2 && !(g_TrueLastButtons[iClient] & IN_ATTACK2 == IN_ATTACK2))
 					{
 						EmitSoundToClient(iClient,"weapons/barret_arm_fizzle.wav",iClient,SNDCHAN_VOICE_BASE);
 					}
