@@ -11,18 +11,18 @@
 			}
 			"CBaseObject::FinishedBuilding"
 			{
-				"windows"       "343"
-				"linux"         "345"
+				"windows"       "344"
+				"linux"         "346"
 			}
 			"CBaseObject::StartUpgrading"
 			{
 				"windows"       "383"
-				"linux"         "384"
+				"linux"         "385"
 			}
 			"CBaseObject::FinishUpgrading"
 			{
 				"windows"       "384"
-				"linux"         "385"
+				"linux"         "386"
 			}
 			"Weapon_ShootPosition"
 			{
