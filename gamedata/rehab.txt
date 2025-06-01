@@ -26,13 +26,13 @@
 			}
 			"Weapon_ShootPosition"
 			{
-				"windows" "275"
-				"linux" "276"
+				"windows" "276"
+				"linux" "277"
 			}
 			"CTFGrenadePipebombProjectile::Detonate"
 			{
-				"windows" "236"
-				"linux" "237"
+				"windows" "237"
+				"linux" "238"
 			}
 		}
 	}
