@@ -9184,7 +9184,7 @@ public void Syringe_PrimaryAttack(int iClient,int primary,float angles[3],int in
 		else
 		{
 			if(kritzed) strcopy(wepSound, 64, "weapons/syringegun_shoot_crit.wav");
-			else strcopy(wepSound, 64, "weapons/tf_medic_syringe_overdose.wav");
+			else strcopy(wepSound, 64, "weapons/syringegun_shoot.wav");
 		}
 		//produce sound to those nearby
 		int iAmmoTable = FindSendPropInfo("CTFWeaponBase", "m_iClip1");
