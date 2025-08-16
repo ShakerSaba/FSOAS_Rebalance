@@ -845,6 +845,13 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 			{
 				TF2_RemoveCondition(iClient,TFCond_Kritzkrieged);
 			}
+			//The Manmelter
+			case 595:
+			{
+				if(StrEqual(event,"player_spawn"))
+					g_meterSec[iClient]=0.0;
+			}
+			
 		}
 
 		switch(meleeIndex)
