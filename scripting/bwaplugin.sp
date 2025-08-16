@@ -50,6 +50,7 @@ int g_flameAttacker[MAXPLAYERS+1];
 int g_dispenserStatus[2048];
 int g_moneyFrames[2048];
 int g_manglerCharge[2048];
+int g_jumpCount[MAXPLAYERS+1];
 float g_buildingHeal[2048];
 float g_holstering[MAXPLAYERS+1];
 float g_holsterPri[MAXPLAYERS+1];
@@ -82,7 +83,7 @@ float HAND_MAX = 8.0;
 float PRESSURE_TIME = 8.0;
 float PRESSURE_FORCE = 2.25;
 float PRESSURE_COST = 33.33;
-float HYPE_COST = 24.5;
+float HYPE_COST = 12.0;
 #define TF_CONDFLAG_VACCMIN			(1 << 0)
 #define TF_CONDFLAG_VACCMED			(1 << 1)
 #define TF_CONDFLAG_VACCMAX      	(1 << 2)
@@ -556,11 +557,11 @@ public Action LogGameMessage(const char[] message)
 		id[idEndPos-idStartPos] = 0;
 		int user = GetClientOfUserId(StringToInt(id));
 		//reward manmelter with crit progress
-		float meter = GetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", 1);
-		if(RoundFloat(meter)%10 == 3)
-			SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", meter+34.0, 1);
+		if(RoundFloat(g_meterSec[user])%10 == 3)
+			g_meterSec[user]+=34.0;
 		else
-			SetEntPropFloat(user, Prop_Send, "m_flItemChargeMeter", meter+33.0, 1);
+			g_meterSec[user]+=33.0;
+		RequestFrame(RemoveMeltCrit,user);
 	}
 	return Plugin_Continue;
 }
@@ -1031,6 +1032,7 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_critHealReset[iClient] = 0.0;
 		g_bonkedDebuff[iClient][0] = 0.0;
 		g_bonkedDebuff[iClient][1] = 0.0;
+		g_jumpCount[iClient] = 0;
 		
 		TF2Attrib_SetByDefIndex(iClient,69,1.0); //set attr indexes for third degree
 		SetEntityGravity(iClient,1.0); //reset jetpack gravity;
@@ -2677,7 +2679,7 @@ public void OnGameFrame()
 			{
 				float vel[3];
 				GetEntPropVector(iClient, Prop_Data, "m_vecVelocity",vel);
-				if((clientFlags & FL_ONGROUND) && vel[2] ==0.0)
+				if((clientFlags & FL_ONGROUND) && vel[2] == 0.0)
 				{
 					g_condFlags[iClient] &= ~TF_CONDFLAG_BLJUMP;
 					TF2_RemoveCondition(iClient,TFCond_BlastJumping);
@@ -2840,18 +2842,23 @@ public void OnGameFrame()
 							{
 								float hype = GetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter");
 								int jumps = GetEntProp(iClient, Prop_Send,"m_iAirDash");
-								if(!(clientFlags & FL_ONGROUND))
+								if(clientFlags & FL_ONGROUND == FL_ONGROUND)
 								{
-									if(hype>=HYPE_COST)
+									g_jumpCount[iClient]=0;
+								}
+								else
+								{
+									if(hype>=(HYPE_COST*(Pow(2.0,g_jumpCount[iClient]+0.0))))
 									{
 										if(jumps==1)
 										{
 											SetEntProp(iClient, Prop_Send,"m_iAirDash",0);
-											hype-=HYPE_COST;
+											hype-=HYPE_COST*(Pow(2.0,g_jumpCount[iClient]+0.0));
 											SetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter",hype);
 											float pos[3];
 											GetClientEyePosition(iClient,pos);
 											EmitAmbientSound("misc/banana_slip.wav",pos,iClient,_,_,0.5);
+											g_jumpCount[iClient]++;
 										}
 									}
 									else
@@ -2859,14 +2866,15 @@ public void OnGameFrame()
 										if(jumps==0) SetEntProp(iClient, Prop_Send,"m_iAirDash",1);
 									}
 								}
-								if(hype>=HYPE_COST && !TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
+								
+								if(hype>=(HYPE_COST*(Pow(2.0,g_jumpCount[iClient]+0.0))) && !TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
 								{
 									TF2_AddCondition(iClient,TFCond_CritHype);
 								}
 								else if(TF2_IsPlayerInCondition(iClient,TFCond_CritHype))
 								{
 									if(hype<99.9) SetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter",hype+0.1415);
-									if(hype<HYPE_COST)
+									if(hype<(HYPE_COST*(Pow(2.0,g_jumpCount[iClient]+0.0))))
 										TF2_RemoveCondition(iClient,TFCond_CritHype);
 								}
 							}
@@ -2974,6 +2982,8 @@ public void OnGameFrame()
 									{
 										g_meterMel[iClient] = 0.0;
 									}
+									if(TF2_IsPlayerInCondition(iClient,TFCond_SpeedBuffAlly) && current!=melee && TF2Util_GetPlayerConditionProvider(iClient,TFCond_SpeedBuffAlly)==melee)
+										TF2_RemoveCondition(iClient,TFCond_SpeedBuffAlly);
 								}
 							}
 						}
@@ -3090,17 +3100,15 @@ public void OnGameFrame()
 										SetEntPropFloat(view, Prop_Send, "m_flPlaybackRate",1.0);
 									}
 								}
-								float meter = GetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", 1);
-								if(meter >= 200)
+								if(g_meterSec[iClient] >= 100)
 								{
 									int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
 									SetEntProp(iClient, Prop_Send, "m_iRevengeCrits",crits+1);
-									g_meterSec[iClient]++;
 									EmitSoundToClient(iClient,"player/recharged.wav");
-									SetEntPropFloat(iClient, Prop_Send, "m_flItemChargeMeter", meter-100, 1);
+									g_meterSec[iClient]=0.0;
 								}
-								SetHudTextParams(-0.1, -0.1, 0.5, 255, 255, 255, 255);
-								ShowHudText(iClient,3,"MELT: %.0f%",meter-100);
+								SetHudTextParams(-0.1, -0.13, 0.5, 255, 255, 255, 255);
+								ShowHudText(iClient,3,"MELT: %.0f%",g_meterSec[iClient]);
 							}
 							//thruster
 							case 1179:
@@ -4342,7 +4350,7 @@ public Action TF2_OnRemoveCond(int iClient,TFCond &condition,float &time, int &p
 		case TFCond_CritHype: //block Soda hype
 		{
 			float hype = GetEntPropFloat(iClient, Prop_Send,"m_flHypeMeter");
-			if(hype>=HYPE_COST)
+			if(hype>=(HYPE_COST*(Pow(2.0,g_jumpCount[iClient]+0.0))))
 			{
 				return Plugin_Handled;
 			}
@@ -4636,11 +4644,6 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				if(secondaryIndex == 595)
 				{
 					int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
-					// remove crits from extinguishing, balance out spent crits
-					if(crits > RoundToFloor(g_meterSec[iClient]))
-						SetEntProp(iClient, Prop_Send, "m_iRevengeCrits", RoundToFloor(g_meterSec[iClient]));
-					else if(crits < g_meterSec[iClient])
-						g_meterSec[iClient] = crits+0.0;
 					// make sure revenge crits are active
 					if(curr==secondary)
 					{
@@ -4836,7 +4839,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 							DataPack pack = new DataPack();
 							pack.Reset();
 							pack.WriteCell(iClient);
-							pack.WriteFloat(meter-40.0);
+							pack.WriteFloat(meter-49.5);
 							RequestFrame(LeapCharge,pack);
 
 							currVel[2] = 550.0;
@@ -5153,7 +5156,7 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						{
 							if((weapon == melee || curr == melee) && !(g_condFlags[iClient] & TF_CONDFLAG_QUICK == TF_CONDFLAG_QUICK))
 							{
-								TF2_AddCondition(iClient,TFCond_SpeedBuffAlly,2.0);
+								TF2_AddCondition(iClient,TFCond_SpeedBuffAlly,2.0,melee);
 								g_condFlags[iClient] |= TF_CONDFLAG_QUICK;
 							}
 						}
@@ -5966,7 +5969,7 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 		{
 			case TFClass_Scout:
 			{
-				if(meleeIndex==325 && damagetype&DMG_CLUB==DMG_CLUB)
+				if(weaponIndex==325 && damagetype&DMG_CLUB==DMG_CLUB)
 				{
 					int vicSec = TF2Util_GetPlayerLoadoutEntity(victim, TFWeaponSlot_Secondary, true);
 					int vicSecIndex = -1;
@@ -6078,11 +6081,10 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 					{
 						if(!tank)
 						{
-							if(GetClientHealth(victim)<=0 && TF2_IsPlayerInCondition(victim,TFCond_OnFire) && damagetype & DMG_BULLET)
+							if(GetClientHealth(victim)<=0 && damagetype & DMG_BULLET)
 							{
 								//reward crit progress against burning player death
-								float meter = GetEntPropFloat(victim, Prop_Send, "m_flItemChargeMeter", 1);
-								SetEntPropFloat(victim, Prop_Send, "m_flItemChargeMeter", meter+50.0, 1);
+								g_meterSec[attacker]+=50.0;
 							}
 						}
 					}
@@ -6653,8 +6655,10 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 								damage += 4*RoundToFloor(burnTime*2);
 								//reward crits
 								RequestFrame(ExtinguishEnemy,victim);
-								float meter = GetEntPropFloat(attacker, Prop_Send, "m_flItemChargeMeter", 1);
-								SetEntPropFloat(attacker, Prop_Send, "m_flItemChargeMeter", meter+50.0, 1);
+								if(RoundFloat(g_meterSec[attacker])%10 == 3)
+									g_meterSec[attacker]+=34.0;
+								else
+									g_meterSec[attacker]+=33.0;
 							}
 						}
 					}
@@ -9920,6 +9924,17 @@ void FlushCleaver(int iClient)
 	}
 }
 
+void RemoveMeltCrit(int iClient)
+{
+	if(IsClientInGame(iClient))
+	{
+		if(IsPlayerAlive(iClient))
+		{
+			int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
+			SetEntProp(iClient, Prop_Send, "m_iRevengeCrits",crits-1);
+		}
+	}
+}
 // Action DetectReload (int weapon)
 // {
 // 	int owner = GetEntPropEnt(weapon, Prop_Send, "m_hOwnerEntity");
