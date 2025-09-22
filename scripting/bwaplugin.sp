@@ -545,6 +545,7 @@ public Action LogGameMessage(const char[] message)
 	}
 	else if(StrContains(message,"player_extinguished") && StrContains(message,"flaregun_revenge") != -1)
 	{
+		//get healer
 		int idStartPos = StrContains(message,"<")+1;
 		int idEndPos = StrContains(message,"[U:1:") - 2;
 		if(idEndPos < 0)
@@ -553,9 +554,26 @@ public Action LogGameMessage(const char[] message)
 		strcopy(id,MAX_NAME_LENGTH,message[idStartPos]);
 		id[idEndPos-idStartPos] = 0;
 		int user = GetClientOfUserId(StringToInt(id));
+		//get victim
+		char[] msg2 = new char[MAX_NAME_LENGTH];
+		strcopy(msg2,MAX_NAME_LENGTH,message[StrContains(message,"player_extinguished")]);
+
+		idStartPos = StrContains(msg2,"<")+1;
+		idEndPos = StrContains(msg2,"[U:1:") - 2;
+		if(idEndPos < 0)
+			idEndPos = StrContains(msg2,"<BOT>") - 1;
+		char[] id2 = new char[MAX_NAME_LENGTH];
+		strcopy(id2,MAX_NAME_LENGTH,msg2[idStartPos]);
+		id2[idEndPos-idStartPos] = 0;
+		int victim = GetClientOfUserId(StringToInt(id2));
 		//reward manmelter with crit progress
 		g_meterSec[user]+=33.3;
-		RequestFrame(RemoveMeltCrit,user);
+		DataPack pack = new DataPack();
+		pack.Reset();
+		pack.WriteCell(user);
+		pack.WriteCell(TF2_IsPlayerInCondition(victim,TFCond_BurningPyro));
+		if(TF2_GetPlayerClass(victim)!=TFClass_Pyro || TF2_IsPlayerInCondition(victim,TFCond_BurningPyro))
+			RequestFrame(RemoveMeltCrit,pack);
 	}
 	return Plugin_Continue;
 }
@@ -2471,12 +2489,19 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 	if(g_condFlags[victim] & TF_CONDFLAG_VOLCANO) //sharpened volcano, if player hit while burning dies they explode
 	{
 		int burner = TF2Util_GetPlayerConditionProvider(victim,TFCond_OnFire);
+		int burnMelee = TF2Util_GetPlayerLoadoutEntity(burner, TFWeaponSlot_Melee, true);
+		int burnMeleeIndex = -1;
+		if(burnMelee >= 0) burnMeleeIndex = GetEntProp(burnMelee, Prop_Send, "m_iItemDefinitionIndex");
 		float targetPos[3], victimPos[3];
 		GetClientEyePosition(victim, victimPos);
 		EmitAmbientSound("misc/halloween/spell_fireball_impact.wav",victimPos,victim);
 		CreateParticle(victim,"ExplosionCore_MidAir_Flare",5.0,_,_,_,_,100.0,1.5,false);
-		int burnerHP = GetClientHealth(burner);
-		TF2Util_TakeHealth(burner,burnerHP+40>260?260.0-burnerHP:40.0,TAKEHEALTH_IGNORE_MAXHEALTH);//heal user
+		if(burnMeleeIndex==348)
+		{
+			int burnerHP = GetClientHealth(burner);
+			TF2Util_TakeHealth(burner,burnerHP+40>260?260.0-burnerHP:40.0,TAKEHEALTH_IGNORE_MAXHEALTH);//heal user
+		}
+		
 		for (int i = 1 ; i <= MaxClients ; i++)
 		{
 			if(IsValidClient(i,false))
@@ -4848,7 +4873,15 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 					if(curr==secondary)
 					{
 						if(crits>0 && !isKritzed(iClient))
-							TF2_AddCondition(iClient,TFCond_Kritzkrieged,1.0);
+							TF2_AddCondition(iClient,TFCond_Kritzkrieged,1.0,iClient);
+					}
+					else
+					{
+						if(TF2_IsPlayerInCondition(iClient,TFCond_Kritzkrieged) && crits<=0)
+						{
+							if(TF2Util_GetPlayerConditionProvider(iClient,TFCond_Kritzkrieged)==iClient||TF2Util_GetPlayerConditionProvider(iClient,TFCond_Kritzkrieged)==-1)
+								TF2_RemoveCondition(iClient,TFCond_Kritzkrieged);
+						}
 					}
 				}
 				//thruster
@@ -8379,7 +8412,7 @@ public void Phlog_SecondaryAttack(int entity,int client,float angles[3],float ve
 														if(TF2_IsPlayerInCondition(idx,TFCond_OnFire)||TF2_IsPlayerInCondition(idx,TFCond_BurningPyro))
 														{
 															TF2_RemoveCondition(idx,TFCond_OnFire);
-															TF2_IsPlayerInCondition(idx,TFCond_BurningPyro);
+															TF2_RemoveCondition(idx,TFCond_BurningPyro);
 															healing++;
 														}
 													}
@@ -9918,14 +9951,35 @@ void FlushCleaver(int iClient)
 	}
 }
 
-void RemoveMeltCrit(int iClient)
+void RemoveMeltCrit(DataPack pack)
 {
+	pack.Reset();
+	int iClient = pack.ReadCell();
+	int redo = pack.ReadCell();
 	if(IsClientInGame(iClient))
 	{
 		if(IsPlayerAlive(iClient))
 		{
-			int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
-			SetEntProp(iClient, Prop_Send, "m_iRevengeCrits",crits-1);
+			if(redo==1)
+			{
+				pack.Reset();
+				pack.WriteCell(iClient);
+				pack.WriteCell(-1);
+				RequestFrame(RemoveMeltCrit,pack);
+			}
+			else
+			{
+				int crits = GetEntProp(iClient, Prop_Send, "m_iRevengeCrits");
+				if(redo==-1)
+				{
+					if(TF2_IsPlayerInCondition(iClient,TFCond_Kritzkrieged) && crits<=1)
+					{
+						if(TF2Util_GetPlayerConditionProvider(iClient,TFCond_Kritzkrieged)==iClient||TF2Util_GetPlayerConditionProvider(iClient,TFCond_Kritzkrieged)==-1)
+							TF2_RemoveCondition(iClient,TFCond_Kritzkrieged);
+					}
+				}
+				SetEntProp(iClient, Prop_Send, "m_iRevengeCrits",crits-1>=0?crits-1:0);
+			}
 		}
 	}
 }
