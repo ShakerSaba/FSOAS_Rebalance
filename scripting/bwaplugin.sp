@@ -2434,7 +2434,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 			if(TF2_IsPlayerInCondition(victim,TFCond_MarkedForDeathSilent)) //sandman refill ball on kill
 			{
 				int inflictor = TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeathSilent);
-				if(IsValidClient(inflictor))
+				if(IsValidClient(inflictor) && inflictor==attacker)
 				{
 					int infMelee = TF2Util_GetPlayerLoadoutEntity(inflictor, TFWeaponSlot_Melee, true);
 					int infMeleeIndex = -1;
