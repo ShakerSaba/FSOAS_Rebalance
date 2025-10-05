@@ -9862,6 +9862,7 @@ void CleanDOT(DataPack pack)
 		if(IsPlayerAlive(iClient))
 		{
 			TF2_RemoveCondition(iClient,TFCond_OnFire);
+			TF2Util_SetPlayerBurnDuration(iClient,0.0);
 			TF2_RemoveCondition(iClient,TFCond_Bleeding);
 			if(bash)
 			{
