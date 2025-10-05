@@ -1218,7 +1218,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 		switch(itemIndex) //melee crit changes
 		{
 			// add 3-hit crit combo to (most) melee weapons - exemptions including swords & knives or those with "no random crits" and/or situational (mini)crits; KGB, SoaS, Skullcutter, atomizer made exempt
-			case 349,43,357,416,38,1000,457,813,834,307,132,266,327,404,482,1082,155,232,450,37,1003,447,173,310,413,171,325:
+			case 349,43,357,416,38,1000,457,813,834,307,132,266,327,404,482,1082,155,232,450,37,1003,447,173,310,413,171,325,452:
 			{
 				g_consecHits[iClient] = -1; //at -1, the consecutive hits won't be counted
 				TF2Attrib_SetByDefIndex(item,15,0.0); //crit mod disabled
@@ -1676,7 +1676,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 				RequestFrame(updateHeads,iClient);
 			}
 			//Boston Basher
-			case 325:
+			case 325,452:
 			{
 				//
 			}
@@ -1824,7 +1824,7 @@ public void TF2Items_OnGiveNamedItem_Post(int iClient, char[] cName, int itemInd
 			//The Sandman
 			case 44:
 			{
-				TF2Attrib_SetByDefIndex(item,125,0.0); //max health additive penalty
+				// TF2Attrib_SetByDefIndex(item,125,0.0); //max health additive penalty
 				TF2Attrib_SetByDefIndex(item,278,1.0); //effect bar recharge rate
 			}
 			//Candy Cane
@@ -2378,7 +2378,7 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 							CreateParticle(attacker,"heavy_ring_of_fire",2.0,_,_,_,_,5.0,_,false,false);
 						}
 					}
-					case 325: //Boston Basher On-Kill
+					case 325,452: //Boston Basher On-Kill
 					{
 						if(attacker!=victim && TF2Util_GetPlayerConditionProvider(victim,TFCond_Bleeding)==attacker) //if killing target you inflicted bleed on, clean debuffs
 						{
@@ -2430,12 +2430,20 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 				}
 			}
 
-			if(g_condFlags[victim] & TF_CONDFLAG_BONK)
+			// if(g_condFlags[victim] & TF_CONDFLAG_BONK)
+			if(TF2_IsPlayerInCondition(victim,TFCond_MarkedForDeathSilent)) //sandman refill ball on kill
 			{
-				//sandman refill ball on kill
-				if(RoundFloat(g_bonkedDebuff[victim][0])==attacker && meleeIndex==44)
+				int inflictor = TF2Util_GetPlayerConditionProvider(victim,TFCond_MarkedForDeathSilent);
+				if(IsValidClient(inflictor))
 				{
-					SetEntPropFloat(melee,Prop_Send,"m_flEffectBarRegenTime",GetGameTime());
+					int infMelee = TF2Util_GetPlayerLoadoutEntity(inflictor, TFWeaponSlot_Melee, true);
+					int infMeleeIndex = -1;
+					if(infMelee >= 0) infMeleeIndex = GetEntProp(infMelee, Prop_Send, "m_iItemDefinitionIndex");
+					// if(RoundFloat(g_bonkedDebuff[victim][0])==attacker && meleeIndex==44)
+					if(infMeleeIndex==44)
+					{
+						SetEntPropFloat(infMelee,Prop_Send,"m_flEffectBarRegenTime",GetGameTime());
+					}
 				}
 			}
 		}
@@ -2501,10 +2509,10 @@ public Action Event_PlayerDeath(Event event, const char[] cName, bool dontBroadc
 		g_condFlags[victim] &= ~TF_CONDFLAG_VOLCANO;
 	}
 
-	if(g_condFlags[victim] & TF_CONDFLAG_BONK) //clear BONKED debuff
-	{
-		g_condFlags[victim] &= ~TF_CONDFLAG_BONK;
-	}
+	// if(g_condFlags[victim] & TF_CONDFLAG_BONK) //clear BONKED debuff
+	// {
+	// 	g_condFlags[victim] &= ~TF_CONDFLAG_BONK;
+	// }
 	
 	return Plugin_Continue;
 }
@@ -2675,18 +2683,18 @@ public void OnGameFrame()
 				}
 			}
 
-			if(g_condFlags[iClient] & TF_CONDFLAG_BONK) //sandman debuff
-			{
-				if(g_bonkedDebuff[iClient][1]>0) g_bonkedDebuff[iClient][1] -= 0.015;
-				if(g_bonkedDebuff[iClient][1]<0)
-				{
-					g_bonkedDebuff[iClient][0] = 0.0;
-					g_bonkedDebuff[iClient][1] = 0.0;
-					g_condFlags[iClient] &= ~TF_CONDFLAG_BONK;
-				}
-				SetHudTextParams(0.1, -0.16, 2.0, 255, 255, 255, 255);
-				ShowHudText(iClient,1,"⋆ BONKED!");
-			}
+			// if(g_condFlags[iClient] & TF_CONDFLAG_BONK) //sandman debuff
+			// {
+			// 	if(g_bonkedDebuff[iClient][1]>0) g_bonkedDebuff[iClient][1] -= 0.015;
+			// 	if(g_bonkedDebuff[iClient][1]<0)
+			// 	{
+			// 		g_bonkedDebuff[iClient][0] = 0.0;
+			// 		g_bonkedDebuff[iClient][1] = 0.0;
+			// 		g_condFlags[iClient] &= ~TF_CONDFLAG_BONK;
+			// 	}
+			// 	SetHudTextParams(0.1, -0.16, 2.0, 255, 255, 255, 255);
+			// 	ShowHudText(iClient,1,"⋆ BONKED!");
+			// }
 
 			if(g_flameDamage[iClient]>0 && g_flameAttacker[iClient]>0 && g_flameAttacker[iClient]<=MaxClients)
 			{
@@ -3754,7 +3762,8 @@ public void OnGameFrame()
 							if(reload!=0)
 							{
 								float reloadSpeed = 2.0;
-								// if(primaryIndex == 230) reloadSpeed=1.5;
+								if(primaryIndex == 752) reloadSpeed=2.5; //hitman reload
+								// if(primaryIndex == 230) reloadSpeed=1.5; //sleeper reload
 								float clientPos[3];
 								GetEntPropVector(iClient, Prop_Send, "m_vecOrigin", clientPos);
 
@@ -4641,6 +4650,8 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 				int ammoCount = GetEntProp(iClient, Prop_Data, "m_iAmmo", _, primaryAmmo);
 
 				float reloadSpeed = 2.0;
+				if(primaryIndex == 752) reloadSpeed=2.5; //hitman reload
+				// if(primaryIndex == 230) reloadSpeed=1.5; //sleeper reload
 				int maxClip = 4;
 				if(primaryIndex==526 || primaryIndex==30665) maxClip=3; //machina clip
 				if(primaryIndex==230) maxClip = 6; //sleeper clip
@@ -5305,20 +5316,20 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 						CreateParticle(iClient,"heavy_ring_of_fire",2.0,_,_,_,_,5.0,_,false,false);
 					}
 				}
-				else if(meleeIndex==44)
-				{
-					int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
-					int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
-					//sandman ball self-mark
-					float atk = GetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack");
-					if(buttons & IN_ATTACK2 && sequence == 12)
-					{
-						if(atk <= GetGameTime() && GetEntPropFloat(melee,Prop_Send,"m_flEffectBarRegenTime")==0.0)
-						{
-							TF2_AddCondition(iClient,TFCond_MarkedForDeathSilent,3.015);
-						}
-					}
-				}
+				// else if(meleeIndex==44)
+				// {
+				// 	int view = GetEntPropEnt(iClient, Prop_Send, "m_hViewModel");
+				// 	int sequence = GetEntProp(view, Prop_Send, "m_nSequence");
+				// 	//sandman ball self-mark
+				// 	float atk = GetEntPropFloat(primary, Prop_Send, "m_flNextSecondaryAttack");
+				// 	if(buttons & IN_ATTACK2 && sequence == 12)
+				// 	{
+				// 		if(atk <= GetGameTime() && GetEntPropFloat(melee,Prop_Send,"m_flEffectBarRegenTime")==0.0)
+				// 		{
+				// 			TF2_AddCondition(iClient,TFCond_MarkedForDeathSilent,3.015);
+				// 		}
+				// 	}
+				// }
 			}
 			case TFClass_Soldier:
 			{
@@ -5886,13 +5897,13 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 		}
 
 		//sandman check for minicrits
-		if(g_condFlags[victim] & TF_CONDFLAG_BONK)
-		{
-			if(RoundFloat(g_bonkedDebuff[victim][0]) == attacker)
-			{
-				TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
-			}
-		}
+		// if(g_condFlags[victim] & TF_CONDFLAG_BONK)
+		// {
+		// 	if(RoundFloat(g_bonkedDebuff[victim][0]) == attacker)
+		// 	{
+		// 		TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,0.015);
+		// 	}
+		// }
 
 		if(damagetype & DMG_CLUB && GetClientTeam(victim) == GetClientTeam(attacker) && victim != attacker)
 		{
@@ -6627,10 +6638,10 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 					float duration = 1.6 + RoundToNearest(distance/100.0)/4.0; //round to nearest quarter second. range of 0-7
 					if(distance>150)
 					{
-						// TF2_AddCondition(victim,TFCond_MarkedForDeath,duration); //minimum 1 second, ~175 distance
-						g_condFlags[victim] |= TF_CONDFLAG_BONK;
-						g_bonkedDebuff[victim][0] = attacker+0.0;
-						g_bonkedDebuff[victim][1] = duration;
+						TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,duration,attacker); //minimum 1 second, ~175 distance
+						// g_condFlags[victim] |= TF_CONDFLAG_BONK;
+						// g_bonkedDebuff[victim][0] = attacker+0.0;
+						// g_bonkedDebuff[victim][1] = duration;
 						CreateParticle(victim,"conc_stars",duration,_,_,_,_,80.0,_,false,false);
 					}
 					TF2_RemoveCondition(victim,TFCond_Dazed); //no slow (removes of other slow effects but most too situational to worry)
@@ -8344,7 +8355,7 @@ public void Phlog_SecondaryAttack(int entity,int client,float angles[3],float ve
 												{
 													if(GetClientTeam(idx)!=GetClientTeam(client) && !TF2_IsPlayerInCondition(idx,TFCond_Ubercharged) && !TF2_IsPlayerInCondition(idx,TFCond_UberchargeFading))
 													{
-														float damage = 20 + 20 * g_temperature[idx];
+														float damage = 15 + 15 * g_temperature[idx];
 														int damagetype = DMG_SHOCK;
 														if(isKritzed(client)) damagetype |= DMG_CRIT;
 														SDKHooks_TakeDamage(idx, entity, client, damage, damagetype, entity, NULL_VECTOR, target_pos, false);
