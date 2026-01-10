@@ -949,6 +949,8 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				{
 					SetEntProp(melee, Prop_Send, "m_bBroken",1);
 					g_meterMel[iClient] = 0.0;
+					TF2Attrib_SetByDefIndex(melee,54,0.9); //move speed penalty
+					TF2Attrib_SetByDefIndex(melee,178,1.0); //deploy time decreased
 				}
 			}
 			//Scotsman's skullcutter
