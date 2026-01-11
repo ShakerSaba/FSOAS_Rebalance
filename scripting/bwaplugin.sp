@@ -2595,34 +2595,28 @@ public Action Event_RoundWin(Event event, const char[] cName, bool dontBroadcast
 
 public void OnGameFrame()
 {
-	//modify spookiness 
-	// ConVar holiday = FindConVar("tf_forced_holiday");
-	// switch(holiday.IntValue)
-	// {
-	// 	case 2: IS_HALLOWEEN=true;
-	// 	default:
-	// 	{
-	// 		char[] mapName = new char[64];
-	// 		GetCurrentMap(mapName,64);
-	// 		if(!IsHalloweenMap(mapName))
-	// 			IS_HALLOWEEN=false;
-	// 	}
-	// }
-	//delete stray particles
 	if(g_nextParticleCheck < GetGameTime())
 	{
-		for (int i=MaxClients; i < 2048; i++)
+		//look for dead particles
+		bool looking = true;
+		int place = -1;
+		int particle = -1;
+		while(looking)
 		{
-			if(IsValidEdict(i))
+			particle = FindEntityByClassname(place, "info_particle_system");
+			if(particle!=-1)
 			{
-				char class[64];
-				GetEntityClassname(i,class,64);
-				if (StrEqual(class, "info_particle_system", false) && g_particles[i]==0)
+				if(IsValidEdict(particle) && g_particles[particle]==0)
 				{
-					AcceptEntityInput(i, "Stop");
-					AcceptEntityInput(i, "Kill");
-					RemoveEdict(i);
+					AcceptEntityInput(particle, "Stop");
+					AcceptEntityInput(particle, "Kill");
+					RemoveEdict(particle);
 				}
+				place = particle;
+			}
+			else
+			{
+				looking = false;
 			}
 		}
 		g_nextParticleCheck = GetGameTime()+1.0;
@@ -5160,9 +5154,9 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 							EmitAmbientSound("misc/rd_finale_beep01.wav",position,iClient,SNDLEVEL_MINIBIKE,_,3.0);
 							SetEntProp(iClient, Prop_Send, "m_bGlowEnabled", 1);
 							CreateTimer(5.0,updateGlow,iClient);
-							int idx, currEnts = GetMaxEntities();
-							for (idx = 1; idx < currEnts; idx++) {
-								if(idx<=MaxClients) //find enemy players
+							//find enemy players
+							for (int idx = 1; idx < MaxClients; idx++) {
+								if(idx<=MaxClients) 
 								{
 									if (IsValidClient(idx,false) && idx != iClient) {
 										if (IsPlayerAlive(idx) && GetClientTeam(idx) != GetClientTeam(iClient) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker)) {
@@ -5177,7 +5171,15 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 										}
 									}
 								}
-								else //find enemy buildings
+							}
+							bool looking = true;
+							int place = -1;
+							int idx = -1;
+							//find enemy buildings
+							while(looking)
+							{
+								idx = FindEntityByClassname(place, "obj_*");
+								if(idx!=-1)
 								{
 									if(IsValidEdict(idx))
 									{
@@ -5193,6 +5195,11 @@ public Action OnPlayerRunCmd(int iClient, int &buttons, int &impulse, float vel[
 											}
 										}
 									}
+									place = idx;
+								}
+								else
+								{
+									looking = false;
 								}
 							}
 						}
@@ -6393,7 +6400,10 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 			if(melee>0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 			if(meleeIndex == 447)
 			{
-				TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,-1.0,victim); //Disciplinary Action mfd on blast jump
+				float vel[3];
+				GetEntPropVector(victim, Prop_Data, "m_vecVelocity",vel);
+				if(vel[2]!=0.0)
+					TF2_AddCondition(victim,TFCond_MarkedForDeathSilent,-1.0,victim); //Disciplinary Action mfd on blast jump
 			}
 		}
 		if (victimClass == TFClass_Engineer)
@@ -6521,6 +6531,10 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				damagetype &= ~DMG_SONIC;
 				damage = 0.01;
 			}
+		}
+		else if(StrEqual("tf_weapon_rocketlauncher_fireball",weaponName) && (damagetype & DMG_IGNITE) && !(damagetype & DMG_BLAST) && damagecustom != TF_CUSTOM_TAUNT_ARMAGEDDON  && !tank)
+		{
+			g_temperature[victim] = 1.0; //max out temp for Dragon's Fury
 		}
 
 		if(weaponIndex==1180)
@@ -7192,28 +7206,34 @@ Action BuildingThink(int building,int client)
 							GetEntPropVector(onbuilding, Prop_Send, "m_vecOrigin", position);
 							EmitAmbientSound("misc/rd_finale_beep01.wav",position,building,SNDLEVEL_MINIBIKE,_,3.0);
 							int team = GetClientTeam(builder);
-							int idx, currEnts = GetMaxEntities();
-							for (idx = 1; idx < currEnts; idx++)
+							//find enemy players
+							for (int idx = 1; idx < MaxClients; idx++)
 							{
-								if(idx<=MaxClients) //find enemy players
+								if (IsValidClient(idx,false))
 								{
-									if (IsValidClient(idx,false))
+									if (IsPlayerAlive(idx) && (GetClientTeam(idx) != team || idx==builder) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker))
 									{
-										if (IsPlayerAlive(idx) && (GetClientTeam(idx) != team || idx==builder) && !TF2_IsPlayerInCondition(idx,TFCond_Cloaked) && !TF2_IsPlayerInCondition(idx,TFCond_CloakFlicker))
+										float distance = getPlayerDistance(onbuilding,idx);
+										if (distance < 512)
 										{
-											float distance = getPlayerDistance(onbuilding,idx);
-											if (distance < 512)
-											{
-												SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
-												EmitSoundToClient(idx, "misc/rd_finale_beep01.wav", idx, _, SNDLEVEL_GUNFIRE, _, SNDVOL_NORMAL, _, _);
-												SetHudTextParams(0.1, -0.16, 3.0, 255, 255, 255, 255);
-												ShowHudText(idx,1,"⊙ REVEALED!");
-												CreateTimer(2.0,updateGlow,idx);
-											}
+											SetEntProp(idx, Prop_Send, "m_bGlowEnabled", 1);
+											EmitSoundToClient(idx, "misc/rd_finale_beep01.wav", idx, _, SNDLEVEL_GUNFIRE, _, SNDVOL_NORMAL, _, _);
+											SetHudTextParams(0.1, -0.16, 3.0, 255, 255, 255, 255);
+											ShowHudText(idx,1,"⊙ REVEALED!");
+											CreateTimer(2.0,updateGlow,idx);
 										}
 									}
 								}
-								else //find enemy buildings
+							}
+							//find enemy buildings
+							bool looking = true;
+							int place = -1;
+							int idx = -1;
+							//find enemy buildings
+							while(looking)
+							{
+								idx = FindEntityByClassname(place, "obj_*");
+								if(idx!=-1)
 								{
 									if(IsValidEdict(idx))
 									{
@@ -7229,6 +7249,11 @@ Action BuildingThink(int building,int client)
 											}
 										}
 									}
+									place = idx;
+								}
+								else
+								{
+									looking = false;
 								}
 							}
 						}
@@ -7283,35 +7308,49 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 				float distance, closestDistance;
 				float client_pos[3],target_pos[3], angles1[3];
 				GetClientEyePosition(attacker,client_pos);
-				for(idx = 1; idx < 2048; idx++)
+
+				bool looking = true;
+				int place = -1;
+				//find enemies
+				while(looking)
 				{
-					if(IsValidEdict(idx) && idx != building && idx != attacker)
+					idx = FindEntityByClassname(place, "obj_*");
+					if(idx!=-1)
 					{
-						GetEntityClassname(idx, class, sizeof(class));
-						if(idx <= MaxClients || StrEqual(class, "obj_sentrygun") || StrEqual(class, "obj_dispenser") || StrEqual(class, "obj_teleporter"))
+						if(IsValidEdict(idx) && idx != building && idx != attacker)
 						{
-							GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
-							target_pos[2]+=40;
-							distance = GetVectorDistance(damagePosition, target_pos);
-							if(distance < 512.0 && GetEntProp(idx, Prop_Send, "m_iTeamNum") != GetEntProp(attacker, Prop_Send, "m_iTeamNum"))
+							char class2[64];
+							GetEntityClassname(idx,class2,64);
+							if(idx <= MaxClients || StrEqual(class2, "obj_sentrygun") || StrEqual(class2, "obj_dispenser") || StrEqual(class2, "obj_teleporter"))
 							{
-								GetClientEyeAngles(attacker, angles1);								
-								Handle hndl = TR_TraceRayFilterEx(client_pos, angles1, MASK_SOLID_BRUSHONLY|CONTENTS_HITBOX, RayType_Infinite, SimpleTraceFilter, idx);
-								if (TR_DidHit(hndl))
+								GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
+								target_pos[2]+=40;
+								distance = GetVectorDistance(damagePosition, target_pos);
+								if(distance < 512.0 && GetEntProp(idx, Prop_Send, "m_iTeamNum") != GetEntProp(attacker, Prop_Send, "m_iTeamNum"))
 								{
-									victim = TR_GetEntityIndex(hndl);
-									if(victim == idx)
+									GetClientEyeAngles(attacker, angles1);								
+									Handle hndl = TR_TraceRayFilterEx(client_pos, angles1, MASK_SOLID_BRUSHONLY|CONTENTS_HITBOX, RayType_Infinite, SimpleTraceFilter, idx);
+									if (TR_DidHit(hndl))
 									{
-										if(closestDistance > distance || closestDistance == 0.0)
+										victim = TR_GetEntityIndex(hndl);
+										if(victim == idx)
 										{
-											hit = TR_GetHitGroup(hndl);
-											closest = idx; closestDistance = distance;
+											if(closestDistance > distance || closestDistance == 0.0)
+											{
+												hit = TR_GetHitGroup(hndl);
+												closest = idx; closestDistance = distance;
+											}
 										}
 									}
+									delete hndl;
 								}
-								delete hndl;
 							}
 						}
+						place = idx;
+					}
+					else
+					{
+						looking = false;
 					}
 				}
 				if(closest != -1)
@@ -8216,83 +8255,95 @@ public void Phlog_SecondaryAttack(int entity,int client,float angles[3],float ve
 				}
 				int extraCharge = 0, lossCharge = 0, healing = 0;
 				
-				for(idx = 1; idx < 2048; idx++)
+				bool looking = true;
+				int place = -1;
+				idx = -1;
+				//find enemy buildings
+				while(looking)
 				{
-					if(IsValidEdict(idx))
+					idx = FindEntityByClassname(place, "tf_projectile_*");
+					if(idx!=-1)
 					{
-						GetEntityClassname(idx, class, sizeof(class));
-						if((idx <= MaxClients) || (StrContains(class, "tf_projectile_") != -1  &&
-						!StrEqual(class, "tf_projectile_energy_ring") && !StrEqual(class, "tf_projectile_mechanicalarmorb")))
+						if(IsValidEdict(idx))
 						{
-							GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
-								
-							if (idx <= MaxClients)
-								target_pos[2] += 41.0;
-
-							distance = GetVectorDistance(player_pos, target_pos);
-							
-							if (distance <= 300.0)
+							char class2[64];
+							GetEntityClassname(idx,class2,64);
+							if(!StrEqual(class2, "tf_projectile_energy_ring") && !StrEqual(class2, "tf_projectile_mechanicalarmorb"))
 							{
-								MakeVectorFromPoints(player_pos, target_pos, vector);
-								
-								GetVectorAngles(vector, angles2);
-								
-								angles2[1] = angles2[1] > 180.0 ? (angles2[1] - 360.0) : angles2[1];
-								
-								angles1[0] = 0.0;
-								angles2[0] = 0.0;
+								GetEntPropVector(idx, Prop_Send, "m_vecOrigin", target_pos);
 								
 								if (idx <= MaxClients)
-									limit = ValveRemapVal(distance, 0.0, 150.0, 70.0, 25.0);
-								else
-									limit = ValveRemapVal(distance, 0.0, 200.0, 80.0, 40.0);
+									target_pos[2] += 41.0;
+
+								distance = GetVectorDistance(player_pos, target_pos);
 								
-								if(CalcViewsOffset(angles1, angles2) < limit)
+								if (distance <= 300.0)
 								{
-									TR_TraceRayFilter(player_pos, target_pos, MASK_SOLID, RayType_EndPoint, TraceFilter, idx);
+									MakeVectorFromPoints(player_pos, target_pos, vector);
+									GetVectorAngles(vector, angles2);
 									
-									if(TR_DidHit() == false)
+									angles2[1] = angles2[1] > 180.0 ? (angles2[1] - 360.0) : angles2[1];
+									angles1[0] = 0.0;
+									angles2[0] = 0.0;
+									
+									if (idx <= MaxClients)
+										limit = ValveRemapVal(distance, 0.0, 150.0, 70.0, 25.0);
+									else
+										limit = ValveRemapVal(distance, 0.0, 200.0, 80.0, 40.0);
+									
+									if(CalcViewsOffset(angles1, angles2) < limit)
 									{
-										if(idx <= MaxClients)
+										TR_TraceRayFilter(player_pos, target_pos, MASK_SOLID, RayType_EndPoint, TraceFilter, idx);
+										
+										if(TR_DidHit() == false)
 										{
-											if(IsValidClient(idx))
+											if(idx <= MaxClients)
 											{
-												if(IsPlayerAlive(idx))
+												if(IsValidClient(idx))
 												{
-													if(GetClientTeam(idx)!=GetClientTeam(client) && !TF2_IsPlayerInCondition(idx,TFCond_Ubercharged) && !TF2_IsPlayerInCondition(idx,TFCond_UberchargeFading))
+													if(IsPlayerAlive(idx))
 													{
-														float damage = 15 + 15 * g_temperature[idx];
-														int damagetype = DMG_SHOCK;
-														if(isKritzed(client)) damagetype |= DMG_CRIT;
-														SDKHooks_TakeDamage(idx, entity, client, damage, damagetype, entity, NULL_VECTOR, target_pos, false);
-														charge += damage/300;
-														extraCharge++;
-													}
-													else{
-														if(TF2_IsPlayerInCondition(idx,TFCond_OnFire)||TF2_IsPlayerInCondition(idx,TFCond_BurningPyro))
+														if(GetClientTeam(idx)!=GetClientTeam(client) && !TF2_IsPlayerInCondition(idx,TFCond_Ubercharged) && !TF2_IsPlayerInCondition(idx,TFCond_UberchargeFading))
 														{
-															TF2_RemoveCondition(idx,TFCond_OnFire);
-															TF2_RemoveCondition(idx,TFCond_BurningPyro);
-															healing++;
+															float damage = 15 + 15 * g_temperature[idx];
+															int damagetype = DMG_SHOCK;
+															if(isKritzed(client)) damagetype |= DMG_CRIT;
+															SDKHooks_TakeDamage(idx, entity, client, damage, damagetype, entity, NULL_VECTOR, target_pos, false);
+															charge += damage/300;
+															extraCharge++;
+														}
+														else
+														{
+															if(TF2_IsPlayerInCondition(idx,TFCond_OnFire)||TF2_IsPlayerInCondition(idx,TFCond_BurningPyro))
+															{
+																TF2_RemoveCondition(idx,TFCond_OnFire);
+																TF2_RemoveCondition(idx,TFCond_BurningPyro);
+																healing++;
+															}
 														}
 													}
 												}
 											}
-										}
-										else
-										{
-											int team = GetEntProp(idx, Prop_Send, "m_iTeamNum");
-											if(team != GetClientTeam(client) && lossCharge<maxDelete)
+											else
 											{
-												CreateParticle(idx,"arm_muzzleflash_electro",1.0);
-												RemoveEntity(idx);
-												lossCharge++;
+												int team = GetEntProp(idx, Prop_Send, "m_iTeamNum");
+												if(team != GetClientTeam(client) && lossCharge<maxDelete)
+												{
+													CreateParticle(idx,"arm_muzzleflash_electro",1.0);
+													RemoveEntity(idx);
+													lossCharge++;
+												}
 											}
 										}
 									}
 								}
 							}
 						}
+						place = idx;
+					}
+					else
+					{
+						looking = false;
 					}
 				}
 				if(extraCharge!=0)
