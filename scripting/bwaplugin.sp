@@ -2718,12 +2718,18 @@ public void OnGameFrame()
 				if (changeFuse)
 				{
 					if (TF2_GetClientTeam(iClient)==TFTeam_Blue) //medic_radiusheal_blue_spikes
-						CreateParticle(iClient,"medic_healradius_blue_buffed",1.0,_,_,_,_,_,_,false,false);
-					else if (TF2_GetClientTeam(iClient)==TFTeam_Red) //medic_radiusheal_blue_spikes
-						CreateParticle(iClient,"medic_healradius_red_buffed",1.0,_,_,_,_,_,_,false,false);
-					if (TF2_IsPlayerInCondition(iClient,TFCond_FocusBuff))
 					{
-						TF2_AddCondition(iClient,TFCond_FocusBuff);
+						CreateParticle(iClient,"medic_radiusheal_blue_volume",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"critical_rocket_bluesparks",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"teleporter_blue_floorglow",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"teleporter_blue_charged_wisps",1.0,_,_,_,_,_,_,false,false);
+					}
+					else if (TF2_GetClientTeam(iClient)==TFTeam_Red) //medic_radiusheal_blue_spikes
+					{
+						CreateParticle(iClient,"medic_radiusheal_red_volume",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"critical_rocket_redsparks",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"teleporter_red_floorglow",1.0,_,_,_,_,_,_,false,false);
+						CreateParticle(iClient,"teleporter_red_charged_wisps",1.0,_,_,_,_,_,_,false,false);
 					}
 				}
 			}
@@ -2731,10 +2737,6 @@ public void OnGameFrame()
 			{
 				if (g_condFlags[iClient] & TF_CONDFLAG_FUSE)
 					g_condFlags[iClient] &= ~TF_CONDFLAG_FUSE;
-				if (TF2_IsPlayerInCondition(iClient,TFCond_FocusBuff))
-				{
-					TF2_RemoveCondition(iClient,TFCond_FocusBuff);
-				}
 			}
 			if(TF2Util_GetPlayerConditionProvider(iClient,TFCond_CritCanteen)==iClient)
 			{
