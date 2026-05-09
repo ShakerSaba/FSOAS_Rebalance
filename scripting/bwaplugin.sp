@@ -69,10 +69,6 @@ float g_flameHit[2048];
 float g_flagTime[2048];
 float g_sapperTime[2048];
 
-float g_fuseMeter[MAXPLAYERS+1][20];
-float g_fuseMeterCheck = 0.0;
-float FUSE_MAX = 800.0;
-
 // int CART = -1;
 // float CARTSPEED = 200.0;
 float g_nextParticleCheck = 0.0;
@@ -120,7 +116,6 @@ float HYPE_COST = 15.0;
 #define TF_CONDFLAG_LOSER			(1 << 30)
 #define TF_CONDFLAG_GRAV			(1 << 31)
 // #define TF_CONDFLAG_???			(1 << 32)
-#define TF_CONDFLAG_FUSE			(1 << 33)
 
 #define EF_BONEMERGE                (1 << 0)
 #define EF_NOSHADOW                 (1 << 4)
@@ -189,7 +184,6 @@ public void OnPluginStart()
 	AddCommandListener(PlayerListener,"eureka_teleport");
 	AddCommandListener(VoiceListener, "voicemenu");
 	AddCommandListener(VoiceListener, "sm_sniper");
-	AddCommandListener(ActivateCrits, "sm_fuse");
 	AddCommandListener(StartUpgrade, "sm_upgrade");
 	AddCommandListener(ExitUpgrade, "sm_exitupgrade");
 	AddCommandListener(PlayerUpgrade, "sm_playerupgrade");
@@ -342,7 +336,6 @@ public void OnMapStart()
 	PrecacheSound("vo/soldier_battlecry05.mp3",true);
 	PrecacheSound("vo/soldier_battlecry06.mp3",true);
 	PrecacheSound("weapons/medigun_no_target.wav",true);
-	PrecacheSound("items/powerup_pickup_crits.wav",true);
 	// PrecacheSound("vo/soldier_painsharp01.mp3",true); //TODO execute when landing
 	// PrecacheSound("vo/soldier_painsharp02.mp3",true);
 	// PrecacheSound("vo/soldier_painsharp03.mp3",true);
@@ -1055,7 +1048,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		g_critHealReset[iClient] = 0.0;
 		g_bonkedDebuff[iClient] = 0;
 		g_jumpCount[iClient] = 0;
-		for (int x=0;x<20;x++) { g_fuseMeter[iClient][x] = 0.0; }
 		
 		TF2Attrib_SetByDefIndex(iClient,69,1.0); //set attr indexes for third degree
 		SetEntityGravity(iClient,1.0); //reset jetpack gravity;
@@ -2599,7 +2591,6 @@ public Action Event_RoundWin(Event event, const char[] cName, bool dontBroadcast
 
 public void OnGameFrame()
 {
-	bool changeFuse = false;
 	if (g_nextParticleCheck < GetGameTime())
 	{
 		//look for dead particles
@@ -2625,11 +2616,6 @@ public void OnGameFrame()
 			}
 		}
 		g_nextParticleCheck = GetGameTime()+3.0;
-	}
-	if (g_fuseMeterCheck < GetGameTime())
-	{
-		changeFuse = true;
-		g_fuseMeterCheck = GetGameTime()+1.0;
 	}
 	
 	for (int i = 1; i <= MaxClients; i++)
@@ -2709,49 +2695,6 @@ public void OnGameFrame()
 					if (TF2_IsPlayerInCondition(iClient,TFCond_ParachuteDeployed) || (clientFlags & FL_ONGROUND))
 						g_meterSec[iClient] = 0.0;
 				}
-			}
-
-			float fuse = 0.0;
-			for (int x=0;x<20;x++) { fuse += g_fuseMeter[iClient][x]; }
-			if (fuse>=FUSE_MAX)
-			{
-				if (changeFuse)
-				{
-					if (TF2_GetClientTeam(iClient)==TFTeam_Blue) //medic_radiusheal_blue_spikes
-					{
-						CreateParticle(iClient,"medic_radiusheal_blue_volume",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"critical_rocket_bluesparks",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"teleporter_blue_floorglow",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"teleporter_blue_charged_wisps",1.0,_,_,_,_,_,_,false,false);
-					}
-					else if (TF2_GetClientTeam(iClient)==TFTeam_Red) //medic_radiusheal_blue_spikes
-					{
-						CreateParticle(iClient,"medic_radiusheal_red_volume",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"critical_rocket_redsparks",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"teleporter_red_floorglow",1.0,_,_,_,_,_,_,false,false);
-						CreateParticle(iClient,"teleporter_red_charged_wisps",1.0,_,_,_,_,_,_,false,false);
-					}
-				}
-			}
-			else
-			{
-				if (g_condFlags[iClient] & TF_CONDFLAG_FUSE)
-					g_condFlags[iClient] &= ~TF_CONDFLAG_FUSE;
-			}
-			if(TF2Util_GetPlayerConditionProvider(iClient,TFCond_CritCanteen)==iClient)
-			{
-				SetHudTextParams(-1.0, -0.5, 0.1, 0, 255, 0, 255);
-				ShowHudText(iClient,1,"LIVE FUSE!");
-			}
-			else
-			{
-				SetHudTextParams(-1.0, -0.3, 0.1, RoundFloat(255*(1.0-GetMin(fuse/FUSE_MAX,1.0))), 255, RoundFloat(255*(1.0-GetMin(fuse/FUSE_MAX,1.0))), 255);
-				ShowHudText(iClient,1,"%.0f%% FUSE",GetMin(100*(fuse/FUSE_MAX),100.0));
-			}
-			if (changeFuse)
-			{
-				for (int x=0;x<19;x++) { g_fuseMeter[iClient][x] = g_fuseMeter[iClient][x+1]; }
-				g_fuseMeter[iClient][19] = 0.0;
 			}
 
 			//for extra blast jump counters
@@ -5876,42 +5819,6 @@ public Action VoiceListener(int iClient, const char[] command, int argc)
 	return Plugin_Continue;
 }
 
-public Action ActivateCrits(int iClient, const char[] command, int argc)
-{
-	if (IsValidClient(iClient))
-	{
-		if (IsPlayerAlive(iClient))
-		{
-			float fuse = 0.0;
-			for (int x=0;x<20;x++) { fuse += g_fuseMeter[iClient][x]; }
-			if (fuse>=FUSE_MAX && !TF2_IsPlayerInCondition(iClient,TFCond_CritCanteen))
-			{
-				bool countCrits = true;
-				int weapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
-				Address addr = TF2Attrib_GetByName(weapon, "crit mod disabled");
-				if (addr != Address_Null)
-				{
-					float value = TF2Attrib_GetValue(addr);
-					if (value==0.0) countCrits = false;
-				}
-				char[] weaponName = new char[64];
-				GetEntityClassname(weapon,weaponName,64);
-				if (StrContains(weaponName,"sniperrifle") != -1 || StrContains(weaponName,"compound") != -1 || StrContains(weaponName,"knife") != -1 || (StrContains(weaponName,"saxxy") != -1 && TF2_GetPlayerClass(iClient)==TFClass_Spy))
-					countCrits = false;
-				if (countCrits)
-				{
-					for (int x=0;x<20;x++) { g_fuseMeter[iClient][x] = 0.0; }
-					TF2_AddCondition(iClient,TFCond_CritCanteen,2.0,iClient);
-					EmitSoundToClient(iClient,"items/powerup_pickup_crits.wav");
-					return Plugin_Continue;
-				}
-			}
-			EmitSoundToClient(iClient,"weapons/medigun_no_target.wav");
-		}
-	}
-	return Plugin_Continue;
-}
-
 public Action StartUpgrade(int iClient, const char[] command, int argc)
 {
 	if (IsValidClient(iClient) && g_bIsMVM)
@@ -6544,37 +6451,6 @@ public void OnTakeDamagePost(int victim, int attacker, int inflictor, float dama
 				g_spawnHealth[victim] = attacker;
 			}
 		}
-
-		//count fuse
-		if (IsValidEdict(weapon) && IsValidClient(attacker))
-		{
-			bool countCrits = true;
-			if (attacker==victim) countCrits = false;
-			Address addr = TF2Attrib_GetByName(weapon, "crit mod disabled");
-			if (addr != Address_Null)
-			{
-				float value = TF2Attrib_GetValue(addr);
-				if (value==0.0) countCrits = false;
-			}
-			char[] weaponName = new char[64];
-			GetEntityClassname(weapon,weaponName,64);
-			if (StrContains(weaponName,"sniperrifle") != -1 || StrContains(weaponName,"compound") != -1 || StrContains(weaponName,"knife") != -1 || (StrContains(weaponName,"saxxy") != -1 && tfAttackerClass==TFClass_Spy))
-				countCrits = false;
-			if (countCrits)
-			{
-				float amount = damage;
-				if (damagetype & DMG_CRIT)
-				{
-					if (isMiniKritzed(attacker,victim))
-						amount /= 1.35;
-					else
-						amount /= 3.0;
-				}
-				if (damagecustom==TF_CUSTOM_BACKSTAB) amount = 40.0;
-				if (damagetype & DMG_CLUB) amount *= 8.0;
-				g_fuseMeter[attacker][19] += amount;
-			}
-		}
 	}
 	// PrintToChatAll("%.2f %d %d %d %d %d",damage,victim,attacker,weapon,inflictor,damagetype);
 }
@@ -6700,17 +6576,17 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 		char[] weaponName = new char[64];
 		GetEntityClassname(weapon,weaponName,64);
 
-		// if (weapon == TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true) && (damagetype & DMG_CLUB)==DMG_CLUB)
-		// {
-		// 	if (g_consecHits[attacker]!=-1 && !(damagetype & DMG_SHOCK))
-		// 	{
-		// 		g_lastHit[attacker] = GetGameTime();
-		// 		g_nextHit[attacker] = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
-		// 		g_consecHits[attacker]++;
-		// 		if ((tfAttackerClass == TFClass_Scout && g_consecHits[attacker]%4==3) || (tfAttackerClass != TFClass_Scout && g_consecHits[attacker]%3==2))
-		// 			CreateTimer((g_nextHit[attacker]-g_lastHit[attacker])*0.5,critGlow,attacker);
-		// 	}
-		// }
+		if (weapon == TF2Util_GetPlayerLoadoutEntity(attacker, TFWeaponSlot_Melee, true) && (damagetype & DMG_CLUB)==DMG_CLUB)
+		{
+			if (g_consecHits[attacker]!=-1 && !(damagetype & DMG_SHOCK))
+			{
+				g_lastHit[attacker] = GetGameTime();
+				g_nextHit[attacker] = GetEntPropFloat(weapon, Prop_Send, "m_flNextPrimaryAttack");
+				g_consecHits[attacker]++;
+				if ((tfAttackerClass == TFClass_Scout && g_consecHits[attacker]%4==3) || (tfAttackerClass != TFClass_Scout && g_consecHits[attacker]%3==2))
+					CreateTimer((g_nextHit[attacker]-g_lastHit[attacker])*0.5,critGlow,attacker);
+			}
+		}
 
 		if (StrEqual("tf_weapon_flamethrower",weaponName) && (damagetype & DMG_IGNITE) && !(damagetype & DMG_BLAST) && damagecustom != TF_CUSTOM_TAUNT_ARMAGEDDON && damagecustom != TF_CUSTOM_DRAGONS_FURY_BONUS_BURNING && damagecustom != TF_CUSTOM_DRAGONS_FURY_IGNITE && !tank)
 		{
@@ -7674,47 +7550,36 @@ Action BuildingDamage (int building, int &attacker, int &inflictor, float &damag
 
 public Action TF2_CalcIsAttackCritical(int client, int weapon, char[] weaponname, bool &result)
 {
-	// TFClassType tfAttackerClass = TF2_GetPlayerClass(client);
+	TFClassType tfAttackerClass = TF2_GetPlayerClass(client);
 	int weaponIndex = -1;
 	if (weapon>0) weaponIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
 	//triple hit crit check
-	// if (weapon == TF2Util_GetPlayerLoadoutEntity(client, TFWeaponSlot_Melee, true))
-	// {
-	// 	if (GetGameTime()-g_lastHit[client] > (g_nextHit[client]-g_lastHit[client])*1.5 && g_consecHits[client]!=-1)
-	// 	{
-	// 		g_consecHits[client]=0;
-	// 		return Plugin_Continue;
-	// 	}
-	// 	if ((tfAttackerClass == TFClass_Scout && g_consecHits[client]%4==3) || (tfAttackerClass != TFClass_Scout && g_consecHits[client]%3==2))
-	// 	{
-	// 		result = true;
-	// 		return Plugin_Changed;
-	// 	}
-	// }
+	if (weapon == TF2Util_GetPlayerLoadoutEntity(client, TFWeaponSlot_Melee, true))
+	{
+		if (GetGameTime()-g_lastHit[client] > (g_nextHit[client]-g_lastHit[client])*1.5 && g_consecHits[client]!=-1)
+		{
+			g_consecHits[client]=0;
+			return Plugin_Continue;
+		}
+		if ((tfAttackerClass == TFClass_Scout && g_consecHits[client]%4==3) || (tfAttackerClass != TFClass_Scout && g_consecHits[client]%3==2))
+		{
+			result = true;
+			return Plugin_Changed;
+		}
+	}
 	if (weaponIndex == 1098) //reset classic headshots
 	{
 		g_meterPri[client] = 0.0;
 	}
 
-	//in fuse
-	if (TF2_IsPlayerInCondition(client,TFCond_CritCanteen))
-	{
-		if(TF2Util_GetPlayerConditionProvider(client,TFCond_CritCanteen)==client)
-		{
-			if (StrContains(weaponname,"minigun")<0 && StrContains(weaponname,"pistol")<0 && StrContains(weaponname,"syringegun")<0 && StrContains(weaponname,"smg")<0)
-			{
-				TF2Util_SetPlayerConditionDuration(client,TFCond_CritCanteen,0.5);
-			}
-		}
-	}
 	return Plugin_Continue;
 }
 
-// Action critGlow(Handle timer, int attacker)
-// {
-// 	TF2_AddCondition(attacker,TFCond_CritDemoCharge,(g_nextHit[attacker]-g_lastHit[attacker])*2.0);
-// 	return Plugin_Continue;
-// }
+Action critGlow(Handle timer, int attacker)
+{
+	TF2_AddCondition(attacker,TFCond_CritDemoCharge,(g_nextHit[attacker]-g_lastHit[attacker])*2.0);
+	return Plugin_Continue;
+}
 
 public void Event_SpawnAmmo(int entity)
 {
