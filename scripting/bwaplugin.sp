@@ -663,6 +663,11 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		int meleeIndex = -1;
 		if (melee >= 0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 		
+		g_condFlags[iClient] |= TF_CONDFLAG_INSPAWN;
+		if (strcmp(event,"player_spawn") == 0)
+		{
+			g_condFlags[iClient] &= ~TF_CONDFLAG_LOSER;
+		}
 		if (g_bIsMVM)
 		{
 			if (strcmp(event,"player_spawn") != 0)
@@ -670,22 +675,19 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 				if (!(g_condFlags[iClient] & TF_CONDFLAG_NOGRADE))
 				{
 					FakeClientCommand(iClient,"sm_upgrade");
-					g_condFlags[iClient] = TF_CONDFLAG_INSPAWN;
 				}
 				else
 				{
-					g_condFlags[iClient] |= TF_CONDFLAG_INSPAWN | TF_CONDFLAG_NOGRADE;
+					g_condFlags[iClient] |= TF_CONDFLAG_NOGRADE;
 				}
 			}
-		}
-		else
-		{
-			g_condFlags[iClient] |= TF_CONDFLAG_INSPAWN;
 		}
 		TF2Attrib_SetByDefIndex(iClient,177,1.0); //weapon switch
 		TF2Attrib_SetByDefIndex(iClient,68,0.0); //increase player capture value
 		TF2Attrib_SetByDefIndex(iClient,400,0.0); //cannot pick up intelligence
 		TF2Attrib_SetByDefIndex(iClient,239,1.0); //ubercharge rate bonus for healer
+
+		PrintToChat(iClient,"LOSER %b",g_condFlags[iClient] & TF_CONDFLAG_LOSER == TF_CONDFLAG_LOSER);
 
 		switch (TF2_GetPlayerClass(iClient))
 		{
@@ -6084,11 +6086,11 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 			case TFClass_Sniper:
 			{
 				if (primary >= 0) primaryIndex = GetEntProp(primary, Prop_Send, "m_iItemDefinitionIndex");
-				if (TF2_IsPlayerInCondition(attacker,TFCond_Slowed))
+				if (TF2_IsPlayerInCondition(attacker,TFCond_Slowed) && TF2_GetClientTeam(attacker) != TF2_GetClientTeam(victim))
 				{
 					switch (primaryIndex)
 					{
-						case 230:  //increase jarate duration on headshot
+						case 230:  //increase sleeper jarate duration on headshot
 						{
 							if (hitgroup == 1)
 								TF2_AddCondition(victim,TFCond_Jarated,5.1,attacker);
@@ -6854,7 +6856,7 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 				if (melee>0) meleeIndex = GetEntProp(melee, Prop_Send, "m_iItemDefinitionIndex");
 				switch (meleeIndex)
 				{
-					case 447:
+					case 447: //disciplinary action
 					{
 						if(attacker!=victim) g_meterMel[attacker] = damage; //track if damaging enemy with blast
 					}
