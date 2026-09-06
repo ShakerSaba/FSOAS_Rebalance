@@ -687,8 +687,6 @@ public Action PlayerSpawn(Handle timer, DataPack dPack)
 		TF2Attrib_SetByDefIndex(iClient,400,0.0); //cannot pick up intelligence
 		TF2Attrib_SetByDefIndex(iClient,239,1.0); //ubercharge rate bonus for healer
 
-		PrintToChat(iClient,"LOSER %b",g_condFlags[iClient] & TF_CONDFLAG_LOSER == TF_CONDFLAG_LOSER);
-
 		switch (TF2_GetPlayerClass(iClient))
 		{
 			case TFClass_Engineer:
